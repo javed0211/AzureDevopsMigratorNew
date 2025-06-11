@@ -7,8 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ExtractionPreviewModal } from "@/components/modals/extraction-preview-modal";
-import { Eye, Settings, Download, Settings2, CheckCircle, ChartGantt, Clock, ChevronLeft, ChevronRight } from "lucide-react";
-import { SiMicrosoft } from "react-icons/si";
+import { Eye, Settings, Download, Settings2, CheckCircle, ChartGantt, Clock, ChevronLeft, ChevronRight, Cloud } from "lucide-react";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Project } from "@shared/schema";
@@ -320,7 +319,7 @@ export default function ProjectSelection() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <SiMicrosoft className="text-azure-blue mr-3 text-lg" />
+                        <Cloud className="text-azure-blue mr-3 text-lg" />
                         <div>
                           <div className="text-sm font-medium text-gray-900">{project.name}</div>
                           <div className="text-sm text-gray-500">{project.description}</div>

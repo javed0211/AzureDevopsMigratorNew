@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Settings } from "lucide-react";
-import { SiMicrosoft } from "react-icons/si";
+import { Cloud } from "lucide-react";
 
 interface AppHeaderProps {
   onRefresh: () => void;
@@ -16,7 +16,7 @@ export function AppHeader({ onRefresh, onOpenSettings, connectionStatus }: AppHe
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <SiMicrosoft className="text-azure-blue text-2xl" />
+              <Cloud className="text-azure-blue text-2xl" />
               <h1 className="text-xl font-semibold text-gray-900">Azure DevOps Migration Tool</h1>
             </div>
             <Badge variant={connectionStatus ? "default" : "secondary"} className={connectionStatus ? "bg-green-100 text-green-800 hover:bg-green-100" : ""}>
