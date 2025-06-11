@@ -79,10 +79,10 @@ export class MemStorage implements IStorage {
   private initializeDefaultData() {
     const defaultConnection: AdoConnection = {
       id: this.currentConnectionId++,
-      name: "Primary Organization",
-      organization: "contoso",
-      baseUrl: "https://dev.azure.com/contoso",
-      patToken: "encrypted_pat_token",
+      name: "DevCGAzureDevOps Organization",
+      organization: "DevCGAzureDevOps",
+      baseUrl: "https://dev.azure.com/DevCGAzureDevOps",
+      patToken: "3EKclZegPyeFeU74lJNyCJno6JQwebr1akrodgDxMe7X1YebyV86JQQJ99BFACAAAAAoySsEAAASAZDO88oj",
       isActive: true,
       createdAt: new Date(),
     };
