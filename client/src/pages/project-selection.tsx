@@ -23,13 +23,18 @@ export default function ProjectSelection() {
   const { toast } = useToast();
 
   // Fetch statistics
-  const { data: statistics } = useQuery({
+  const { data: statistics = {} } = useQuery<{
+    totalProjects: number;
+    selectedProjects: number;
+    inProgressProjects: number;
+    migratedProjects: number;
+  }>({
     queryKey: ["/api/statistics"],
     refetchInterval: 5000,
   });
 
   // Fetch projects
-  const { data: projects = [], isLoading: projectsLoading } = useQuery({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
     refetchInterval: 5000,
   });

@@ -121,6 +121,7 @@ export class MemStorage implements IStorage {
     const newConnection: AdoConnection = {
       ...connection,
       id,
+      isActive: connection.isActive ?? false,
       createdAt: new Date(),
     };
     this.adoConnections.set(id, newConnection);
@@ -154,7 +155,18 @@ export class MemStorage implements IStorage {
 
   async createProject(project: InsertProject): Promise<Project> {
     const id = this.currentProjectId++;
-    const newProject: Project = { ...project, id };
+    const newProject: Project = { 
+      ...project, 
+      id,
+      status: project.status ?? "ready",
+      description: project.description ?? null,
+      createdDate: project.createdDate ?? null,
+      connectionId: project.connectionId ?? null,
+      workItemCount: project.workItemCount ?? 0,
+      repoCount: project.repoCount ?? 0,
+      testCaseCount: project.testCaseCount ?? 0,
+      pipelineCount: project.pipelineCount ?? 0,
+    };
     this.projects.set(id, newProject);
     return newProject;
   }
@@ -190,6 +202,12 @@ export class MemStorage implements IStorage {
     const newJob: MigrationJob = {
       ...job,
       id,
+      status: job.status ?? "pending",
+      progress: job.progress ?? 0,
+      projectId: job.projectId ?? null,
+      sourceConnectionId: job.sourceConnectionId ?? null,
+      targetConnectionId: job.targetConnectionId ?? null,
+      errorMessage: job.errorMessage ?? null,
       startedAt: null,
       completedAt: null,
     };
@@ -219,6 +237,8 @@ export class MemStorage implements IStorage {
     const newLog: AuditLog = {
       ...log,
       id,
+      jobId: log.jobId ?? null,
+      details: log.details ?? null,
       timestamp: new Date(),
     };
     this.auditLogs.set(id, newLog);
