@@ -305,8 +305,12 @@ async def update_project_status(project_id: int, status: str):
     finally:
         conn.close()
 
+class BulkStatusRequest(BaseModel):
+    project_ids: List[int]
+    status: str
+
 @app.post("/api/projects/bulk-status")
-async def update_bulk_project_status(project_ids: List[int], status: str):
+async def update_bulk_project_status(request: BulkStatusRequest):
     """Update status for multiple projects"""
     conn = get_db_connection()
     try:
@@ -319,7 +323,7 @@ async def update_bulk_project_status(project_ids: List[int], status: str):
                       work_item_count as workItemCount, repo_count as repoCount, 
                       test_case_count as testCaseCount, pipeline_count as pipelineCount,
                       connection_id as connectionId
-        """, (status, project_ids))
+        """, (request.status, request.project_ids))
         
         projects = cursor.fetchall()
         conn.commit()
