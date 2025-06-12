@@ -1,30 +1,26 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle, Clock, AlertCircle, Database } from "lucide-react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Database, CheckCircle, Clock, AlertCircle } from "lucide-react";
 
 export default function ExtractionOverview() {
-  // Fetch extraction jobs from the API
   const { data: jobs = [], isLoading } = useQuery({
-    queryKey: ["/api/jobs"],
-    refetchInterval: 5000,
+    queryKey: ['/api/extraction/jobs'],
   });
-
-  const inProgressJobs = jobs.filter((job: any) => job.status === "in_progress");
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Extraction Overview</h2>
-        <Badge variant="outline">
-          {inProgressJobs.length} {inProgressJobs.length === 1 ? 'Project' : 'Projects'} in Progress
-        </Badge>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Extraction Overview</h1>
+        <p className="text-muted-foreground">
+          Monitor and manage your Azure DevOps extraction jobs
+        </p>
       </div>
 
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="work-items">Work Items</TabsTrigger>
@@ -39,7 +35,7 @@ export default function ExtractionOverview() {
               <Database className="h-8 w-8 animate-spin" />
               <span className="ml-2">Loading extraction jobs...</span>
             </div>
-          ) : jobs.length === 0 ? (
+          ) : (jobs as any[]).length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center h-64">
                 <Database className="h-12 w-12 text-gray-400 mb-4" />
@@ -51,7 +47,7 @@ export default function ExtractionOverview() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {jobs.map((job: any) => (
+              {(jobs as any[]).map((job: any) => (
                 <Card key={job.id}>
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
@@ -99,90 +95,6 @@ export default function ExtractionOverview() {
               ))}
             </div>
           )}
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Mobile App Backend
-                  <Badge className="bg-green-100 text-green-800">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Completed
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>Overall Progress</span>
-                      <span>100%</span>
-                    </div>
-                    <Progress value={100} className="h-2" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <div className="text-gray-500">Work Items</div>
-                      <div className="font-medium">156 / 156</div>
-                    </div>
-                    <div>
-                      <div className="text-gray-500">Repositories</div>
-                      <div className="font-medium">8 / 8</div>
-                    </div>
-                    <div>
-                      <div className="text-gray-500">Test Cases</div>
-                      <div className="font-medium">45 / 45</div>
-                    </div>
-                    <div>
-                      <div className="text-gray-500">Pipelines</div>
-                      <div className="font-medium">12 / 12</div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Data Analytics Platform
-                  <Badge className="bg-red-100 text-red-800">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    Error
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>Overall Progress</span>
-                      <span>23%</span>
-                    </div>
-                    <Progress value={23} className="h-2" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <div className="text-gray-500">Work Items</div>
-                      <div className="font-medium">89 / 89</div>
-                    </div>
-                    <div>
-                      <div className="text-gray-500">Repositories</div>
-                      <div className="font-medium text-red-600">Failed</div>
-                    </div>
-                    <div>
-                      <div className="text-gray-500">Test Cases</div>
-                      <div className="font-medium">0 / 34</div>
-                    </div>
-                    <div>
-                      <div className="text-gray-500">Pipelines</div>
-                      <div className="font-medium">0 / 8</div>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm" className="w-full">
-                    Retry Extraction
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </TabsContent>
 
         <TabsContent value="work-items">
@@ -191,7 +103,7 @@ export default function ExtractionOverview() {
               <CardTitle>Work Items Extraction</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-600">Work items extraction details will be displayed here.</p>
+              <p className="text-gray-500">Work items extraction details will appear here.</p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -202,7 +114,7 @@ export default function ExtractionOverview() {
               <CardTitle>Repository Extraction</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-600">Repository extraction details will be displayed here.</p>
+              <p className="text-gray-500">Repository extraction details will appear here.</p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -213,7 +125,7 @@ export default function ExtractionOverview() {
               <CardTitle>Test Cases Extraction</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-600">Test cases extraction details will be displayed here.</p>
+              <p className="text-gray-500">Test cases extraction details will appear here.</p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -224,7 +136,7 @@ export default function ExtractionOverview() {
               <CardTitle>Pipelines Extraction</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-600">Pipelines extraction details will be displayed here.</p>
+              <p className="text-gray-500">Pipeline extraction details will appear here.</p>
             </CardContent>
           </Card>
         </TabsContent>
