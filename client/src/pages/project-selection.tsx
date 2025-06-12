@@ -41,7 +41,7 @@ export default function ProjectSelection() {
 
   // Sync projects mutation
   const syncProjectsMutation = useMutation({
-    mutationFn: () => api.projects.sync(1), // Using default connection ID
+    mutationFn: () => api.projects.sync(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       queryClient.invalidateQueries({ queryKey: ["/api/statistics"] });
@@ -62,7 +62,7 @@ export default function ProjectSelection() {
   // Bulk select mutation
   const bulkSelectMutation = useMutation({
     mutationFn: ({ projectIds, status }: { projectIds: number[], status: string }) =>
-      api.projects.bulkSelect(projectIds, status),
+      api.projects.bulkUpdateStatus(projectIds, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       queryClient.invalidateQueries({ queryKey: ["/api/statistics"] });
