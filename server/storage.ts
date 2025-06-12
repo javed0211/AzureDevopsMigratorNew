@@ -1,3 +1,4 @@
+import { Pool } from 'pg';
 import { 
   users, 
   adoConnections, 
@@ -15,6 +16,12 @@ import {
   type AuditLog,
   type InsertAuditLog
 } from "@shared/schema";
+
+// Database connection
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
 
 export interface IStorage {
   // Users
@@ -246,4 +253,387 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  // Projects - Enhanced to use PostgreSQL backend
+  async getProjects(connectionId?: number): Promise<Project[]> {
+    const client = await pool.connect();
+    try {
+      let query = `
+        SELECT id, external_id as "externalId", name, description, 
+               process_template as "processTemplate", source_control as "sourceControl",
+               visibility, status, created_date as "createdDate",
+               work_item_count as "workItemCount", repo_count as "repoCount", 
+               test_case_count as "testCaseCount", pipeline_count as "pipelineCount",
+               connection_id as "connectionId"
+        FROM projects
+      `;
+      const params: any[] = [];
+      
+      if (connectionId) {
+        query += ' WHERE connection_id = $1';
+        params.push(connectionId);
+      }
+      
+      query += ' ORDER BY name';
+      
+      const result = await client.query(query, params);
+      return result.rows;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getProject(id: number): Promise<Project | undefined> {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(`
+        SELECT id, external_id as "externalId", name, description, 
+               process_template as "processTemplate", source_control as "sourceControl",
+               visibility, status, created_date as "createdDate",
+               work_item_count as "workItemCount", repo_count as "repoCount", 
+               test_case_count as "testCaseCount", pipeline_count as "pipelineCount",
+               connection_id as "connectionId"
+        FROM projects WHERE id = $1
+      `, [id]);
+      return result.rows[0];
+    } finally {
+      client.release();
+    }
+  }
+
+  async createProject(project: InsertProject): Promise<Project> {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(`
+        INSERT INTO projects (external_id, name, description, process_template, 
+                            source_control, visibility, status, created_date,
+                            work_item_count, repo_count, test_case_count, 
+                            pipeline_count, connection_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        RETURNING id, external_id as "externalId", name, description, 
+                  process_template as "processTemplate", source_control as "sourceControl",
+                  visibility, status, created_date as "createdDate",
+                  work_item_count as "workItemCount", repo_count as "repoCount", 
+                  test_case_count as "testCaseCount", pipeline_count as "pipelineCount",
+                  connection_id as "connectionId"
+      `, [
+        project.externalId, project.name, project.description, project.processTemplate,
+        project.sourceControl, project.visibility, project.status || "ready", 
+        project.createdDate, project.workItemCount || 0, project.repoCount || 0,
+        project.testCaseCount || 0, project.pipelineCount || 0, project.connectionId
+      ]);
+      return result.rows[0];
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateProject(id: number, project: Partial<Project>): Promise<Project | undefined> {
+    const client = await pool.connect();
+    try {
+      const setParts = [];
+      const values = [];
+      let paramIndex = 1;
+
+      Object.entries(project).forEach(([key, value]) => {
+        if (value !== undefined) {
+          const dbKey = key === 'externalId' ? 'external_id' :
+                       key === 'processTemplate' ? 'process_template' :
+                       key === 'sourceControl' ? 'source_control' :
+                       key === 'createdDate' ? 'created_date' :
+                       key === 'workItemCount' ? 'work_item_count' :
+                       key === 'repoCount' ? 'repo_count' :
+                       key === 'testCaseCount' ? 'test_case_count' :
+                       key === 'pipelineCount' ? 'pipeline_count' :
+                       key === 'connectionId' ? 'connection_id' : key;
+          setParts.push(`${dbKey} = $${paramIndex++}`);
+          values.push(value);
+        }
+      });
+
+      if (setParts.length === 0) return this.getProject(id);
+
+      values.push(id);
+      const result = await client.query(`
+        UPDATE projects 
+        SET ${setParts.join(', ')}
+        WHERE id = $${paramIndex}
+        RETURNING id, external_id as "externalId", name, description, 
+                  process_template as "processTemplate", source_control as "sourceControl",
+                  visibility, status, created_date as "createdDate",
+                  work_item_count as "workItemCount", repo_count as "repoCount", 
+                  test_case_count as "testCaseCount", pipeline_count as "pipelineCount",
+                  connection_id as "connectionId"
+      `, values);
+      
+      return result.rows[0];
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteProject(id: number): Promise<boolean> {
+    const client = await pool.connect();
+    try {
+      const result = await client.query('DELETE FROM projects WHERE id = $1', [id]);
+      return result.rowCount > 0;
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateProjectStatus(id: number, status: string): Promise<Project | undefined> {
+    return this.updateProject(id, { status });
+  }
+
+  // ADO Connections - Enhanced PostgreSQL backend
+  async getAdoConnections(): Promise<AdoConnection[]> {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(`
+        SELECT id, name, organization, base_url as "baseUrl", 
+               is_active as "isActive", created_at as "createdAt"
+        FROM ado_connections 
+        WHERE is_active = true
+        ORDER BY created_at DESC
+      `);
+      return result.rows;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getAdoConnection(id: number): Promise<AdoConnection | undefined> {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(`
+        SELECT id, name, organization, base_url as "baseUrl", 
+               is_active as "isActive", created_at as "createdAt"
+        FROM ado_connections WHERE id = $1
+      `, [id]);
+      return result.rows[0];
+    } finally {
+      client.release();
+    }
+  }
+
+  async createAdoConnection(connection: InsertAdoConnection): Promise<AdoConnection> {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(`
+        INSERT INTO ado_connections (name, organization, base_url, pat_token, is_active, created_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+        RETURNING id, name, organization, base_url as "baseUrl", 
+                  is_active as "isActive", created_at as "createdAt"
+      `, [
+        connection.name, 
+        connection.organization, 
+        connection.baseUrl, 
+        connection.patToken, 
+        connection.isActive ?? true
+      ]);
+      return result.rows[0];
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateAdoConnection(id: number, connection: Partial<AdoConnection>): Promise<AdoConnection | undefined> {
+    const client = await pool.connect();
+    try {
+      const setParts = [];
+      const values = [];
+      let paramIndex = 1;
+
+      Object.entries(connection).forEach(([key, value]) => {
+        if (value !== undefined) {
+          const dbKey = key === 'baseUrl' ? 'base_url' :
+                       key === 'patToken' ? 'pat_token' :
+                       key === 'isActive' ? 'is_active' :
+                       key === 'createdAt' ? 'created_at' : key;
+          setParts.push(`${dbKey} = $${paramIndex++}`);
+          values.push(value);
+        }
+      });
+
+      if (setParts.length === 0) return this.getAdoConnection(id);
+
+      values.push(id);
+      const result = await client.query(`
+        UPDATE ado_connections 
+        SET ${setParts.join(', ')}
+        WHERE id = $${paramIndex}
+        RETURNING id, name, organization, base_url as "baseUrl", 
+                  is_active as "isActive", created_at as "createdAt"
+      `, values);
+      
+      return result.rows[0];
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteAdoConnection(id: number): Promise<boolean> {
+    const client = await pool.connect();
+    try {
+      const result = await client.query('UPDATE ado_connections SET is_active = false WHERE id = $1', [id]);
+      return result.rowCount > 0;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Migration Jobs - Mapped to extraction_jobs table
+  async getMigrationJobs(): Promise<MigrationJob[]> {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(`
+        SELECT id, project_id as "projectId", artifact_type as "type", 
+               status, started_at as "startedAt", completed_at as "completedAt",
+               error_message as "errorMessage", progress,
+               1 as "sourceConnectionId", 1 as "targetConnectionId"
+        FROM extraction_jobs 
+        ORDER BY started_at DESC
+      `);
+      return result.rows;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getMigrationJob(id: number): Promise<MigrationJob | undefined> {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(`
+        SELECT id, project_id as "projectId", artifact_type as "type", 
+               status, started_at as "startedAt", completed_at as "completedAt",
+               error_message as "errorMessage", progress,
+               1 as "sourceConnectionId", 1 as "targetConnectionId"
+        FROM extraction_jobs WHERE id = $1
+      `, [id]);
+      return result.rows[0];
+    } finally {
+      client.release();
+    }
+  }
+
+  async createMigrationJob(job: InsertMigrationJob): Promise<MigrationJob> {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(`
+        INSERT INTO extraction_jobs (project_id, artifact_type, status, started_at, progress)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, project_id as "projectId", artifact_type as "type", 
+                  status, started_at as "startedAt", completed_at as "completedAt",
+                  error_message as "errorMessage", progress,
+                  1 as "sourceConnectionId", 1 as "targetConnectionId"
+      `, [
+        job.projectId,
+        job.type || 'migration',
+        job.status || 'pending',
+        job.startedAt,
+        job.progress || 0
+      ]);
+      return result.rows[0];
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateMigrationJob(id: number, job: Partial<MigrationJob>): Promise<MigrationJob | undefined> {
+    const client = await pool.connect();
+    try {
+      const setParts = [];
+      const values = [];
+      let paramIndex = 1;
+
+      Object.entries(job).forEach(([key, value]) => {
+        if (value !== undefined && key !== 'sourceConnectionId' && key !== 'targetConnectionId') {
+          const dbKey = key === 'projectId' ? 'project_id' :
+                       key === 'type' ? 'artifact_type' :
+                       key === 'startedAt' ? 'started_at' :
+                       key === 'completedAt' ? 'completed_at' :
+                       key === 'errorMessage' ? 'error_message' : key;
+          setParts.push(`${dbKey} = $${paramIndex++}`);
+          values.push(value);
+        }
+      });
+
+      if (setParts.length === 0) return this.getMigrationJob(id);
+
+      values.push(id);
+      const result = await client.query(`
+        UPDATE extraction_jobs 
+        SET ${setParts.join(', ')}
+        WHERE id = $${paramIndex}
+        RETURNING id, project_id as "projectId", artifact_type as "type", 
+                  status, started_at as "startedAt", completed_at as "completedAt",
+                  error_message as "errorMessage", progress,
+                  1 as "sourceConnectionId", 1 as "targetConnectionId"
+      `, values);
+      
+      return result.rows[0];
+    } finally {
+      client.release();
+    }
+  }
+
+  // Audit Logs - Mapped to extraction_logs table
+  async getAuditLogs(jobId?: number): Promise<AuditLog[]> {
+    const client = await pool.connect();
+    try {
+      let query = `
+        SELECT id, job_id as "jobId", level, message, details, timestamp
+        FROM extraction_logs
+      `;
+      const params: any[] = [];
+      
+      if (jobId) {
+        query += ' WHERE job_id = $1';
+        params.push(jobId);
+      }
+      
+      query += ' ORDER BY timestamp DESC';
+      
+      const result = await client.query(query, params);
+      return result.rows;
+    } finally {
+      client.release();
+    }
+  }
+
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(`
+        INSERT INTO extraction_logs (job_id, level, message, details, timestamp)
+        VALUES ($1, $2, $3, $4, NOW())
+        RETURNING id, job_id as "jobId", level, message, details, timestamp
+      `, [
+        log.jobId,
+        log.level || 'INFO',
+        log.message,
+        log.details || {}
+      ]);
+      return result.rows[0];
+    } finally {
+      client.release();
+    }
+  }
+
+  // Legacy User methods - maintained for compatibility
+  async getUser(id: number): Promise<User | undefined> {
+    return undefined; // Not implemented in current schema
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return undefined; // Not implemented in current schema
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    throw new Error('User management not implemented in database storage');
+  }
+}
+
+// Use PostgreSQL-backed storage
+export const storage = new DatabaseStorage();
