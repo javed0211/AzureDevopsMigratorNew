@@ -147,57 +147,70 @@ async def root():
     """Root endpoint"""
     return {"message": "Azure DevOps Migration Tool API", "version": "1.0.0", "backend": "Python FastAPI"}
 
-@app.get("/api/projects", response_model=List[ProjectResponse])
+@app.get("/api/projects")
 async def get_projects():
     """Get all projects from database"""
-    conn = get_db_connection()
     try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, external_id as externalId, name, description, 
-                   process_template as processTemplate, source_control as sourceControl,
-                   visibility, status, created_date as createdDate,
-                   work_item_count as workItemCount, repo_count as repoCount, 
-                   test_case_count as testCaseCount, pipeline_count as pipelineCount,
-                   connection_id as connectionId
-            FROM projects 
-            ORDER BY name
-        """)
-        projects = cursor.fetchall()
-        return [ProjectResponse(**dict(project)) for project in projects]
-    finally:
-        conn.close()
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, external_id as externalId, name, description, 
+                       process_template as processTemplate, source_control as sourceControl,
+                       visibility, status, created_date as createdDate,
+                       work_item_count as workItemCount, repo_count as repoCount, 
+                       test_case_count as testCaseCount, pipeline_count as pipelineCount,
+                       connection_id as connectionId
+                FROM projects 
+                ORDER BY name
+            """)
+            projects = cursor.fetchall()
+            return [dict(project) for project in projects]
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error(f"Error fetching projects: {e}")
+        return {"message": "Failed to fetch projects"}
 
-@app.get("/api/statistics", response_model=StatisticsResponse)
+@app.get("/api/statistics")
 async def get_statistics():
     """Get project statistics"""
-    conn = get_db_connection()
     try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT 
-                COUNT(*) as total_projects,
-                SUM(CASE WHEN status = 'selected' THEN 1 ELSE 0 END) as selected_projects,
-                SUM(CASE WHEN status IN ('extracting', 'migrating') THEN 1 ELSE 0 END) as in_progress_projects,
-                SUM(CASE WHEN status = 'migrated' THEN 1 ELSE 0 END) as migrated_projects
-            FROM projects
-        """)
-        
-        result = cursor.fetchone()
-        return StatisticsResponse(
-            totalProjects=int(result['total_projects']) if result['total_projects'] else 0,
-            selectedProjects=int(result['selected_projects']) if result['selected_projects'] else 0,
-            inProgressProjects=int(result['in_progress_projects']) if result['in_progress_projects'] else 0,
-            migratedProjects=int(result['migrated_projects']) if result['migrated_projects'] else 0
-        )
-    finally:
-        conn.close()
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) as total_projects,
+                    SUM(CASE WHEN status = 'selected' THEN 1 ELSE 0 END) as selected_projects,
+                    SUM(CASE WHEN status IN ('extracting', 'migrating') THEN 1 ELSE 0 END) as in_progress_projects,
+                    SUM(CASE WHEN status = 'migrated' THEN 1 ELSE 0 END) as migrated_projects
+                FROM projects
+            """)
+            
+            result = cursor.fetchone()
+            return {
+                "totalProjects": int(result['total_projects']) if result['total_projects'] else 0,
+                "selectedProjects": int(result['selected_projects']) if result['selected_projects'] else 0,
+                "inProgressProjects": int(result['in_progress_projects']) if result['in_progress_projects'] else 0,
+                "migratedProjects": int(result['migrated_projects']) if result['migrated_projects'] else 0,
+                "totalJobs": 0,
+                "runningJobs": 0,
+                "completedJobs": 0,
+                "failedJobs": 0
+            }
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error(f"Error fetching statistics: {e}")
+        return {"message": "Failed to fetch statistics"}
 
 # Connection endpoints
 @app.get("/api/connections")
 async def get_connections():
     """Get all Azure DevOps connections"""
-    conn = get_db_connection()
+    try:
+        conn = get_db_connection()
     try:
         cursor = conn.cursor()
         cursor.execute("""
