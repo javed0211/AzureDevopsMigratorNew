@@ -6,6 +6,18 @@ class ConnectionCreate(BaseModel):
     name: str
     organization: str
     pat_token: str
+    patToken: Optional[str] = None  # Alternative field name for frontend compatibility
+    type: Optional[str] = "source"
+    is_active: Optional[bool] = True
+    isActive: Optional[bool] = None  # Alternative field name for frontend compatibility
+    
+    def __init__(self, **data):
+        # Handle alternative field names
+        if 'patToken' in data and 'pat_token' not in data:
+            data['pat_token'] = data['patToken']
+        if 'isActive' in data and 'is_active' not in data:
+            data['is_active'] = data['isActive']
+        super().__init__(**data)
 
 class ConnectionResponse(BaseModel):
     id: int

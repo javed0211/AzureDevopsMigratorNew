@@ -193,10 +193,102 @@ async def get_statistics():
     finally:
         conn.close()
 
+# Connection endpoints
+@app.get("/api/connections")
+async def get_connections():
+    """Get all Azure DevOps connections"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, name, organization, base_url, type, is_active, created_at
+            FROM ado_connections 
+            WHERE is_active = true
+            ORDER BY created_at DESC
+        """)
+        connections = cursor.fetchall()
+        return [dict(connection) for connection in connections]
+    finally:
+        conn.close()
+
+@app.post("/api/connections")
+async def create_connection(connection_data: dict):
+    """Create or update Azure DevOps connection"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        
+        # Extract data with fallbacks for different field names
+        name = connection_data.get('name', '')
+        organization = connection_data.get('organization', '').replace('https://dev.azure.com/', '')
+        pat_token = connection_data.get('patToken') or connection_data.get('pat_token', '')
+        conn_type = connection_data.get('type', 'source')
+        is_active = connection_data.get('isActive', connection_data.get('is_active', True))
+        base_url = f"https://dev.azure.com/{organization}"
+        
+        if not organization or not pat_token:
+            raise HTTPException(status_code=400, detail="Organization and PAT token are required")
+        
+        # Check if connection already exists
+        cursor.execute("""
+            SELECT id FROM ado_connections 
+            WHERE organization = %s AND type = %s
+        """, (organization, conn_type))
+        
+        existing = cursor.fetchone()
+        
+        if existing:
+            # Update existing connection
+            cursor.execute("""
+                UPDATE ado_connections 
+                SET name = %s, pat_token = %s, is_active = %s, base_url = %s
+                WHERE id = %s
+                RETURNING id, name, organization, base_url, type, is_active, created_at
+            """, (name, pat_token, is_active, base_url, existing['id']))
+        else:
+            # Create new connection
+            cursor.execute("""
+                INSERT INTO ado_connections (name, organization, base_url, pat_token, type, is_active)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id, name, organization, base_url, type, is_active, created_at
+            """, (name, organization, base_url, pat_token, conn_type, is_active))
+        
+        result = cursor.fetchone()
+        conn.commit()
+        return dict(result)
+        
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Error creating connection: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.post("/api/connections/test")
+async def test_connection(test_data: dict):
+    """Test Azure DevOps connection with provided credentials"""
+    try:
+        organization = test_data.get('organization', '').replace('https://dev.azure.com/', '')
+        pat_token = test_data.get('patToken') or test_data.get('pat_token')
+        
+        if not organization or not pat_token:
+            raise HTTPException(status_code=400, detail="Organization and PAT token are required")
+        
+        client = AzureDevOpsClient(organization, pat_token)
+        is_valid = await client.test_connection()
+        
+        if is_valid:
+            return {"status": "success", "message": "Connection test successful"}
+        else:
+            return {"status": "error", "message": "Connection test failed"}
+    except Exception as e:
+        logger.error(f"Error testing connection: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/projects/sync")
 async def sync_projects():
     """Sync projects from Azure DevOps"""
-    # Get the default connection from database
+    # Get the source connection from database
     conn = get_db_connection()
     try:
         cursor = conn.cursor()

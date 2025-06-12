@@ -13,6 +13,7 @@ class ADOConnection(Base):
     organization = Column(String(255), nullable=False)
     base_url = Column(String(500), nullable=False)
     pat_token = Column(Text, nullable=False)
+    type = Column(String(50), default="source")  # source, target
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
