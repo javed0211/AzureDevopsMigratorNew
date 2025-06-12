@@ -174,76 +174,90 @@ class AzureDevOpsClient {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // Proxy ADO Connections to Python backend
+  // ADO Connections API
   app.get("/api/connections", async (req, res) => {
     try {
-      const response = await fetch("http://localhost:8000/api/connections");
-      const data = await response.json();
-      res.json(data);
+      const connections = await storage.getAdoConnections();
+      res.json(connections);
     } catch (error) {
+      console.error('Error fetching connections:', error);
       res.status(500).json({ message: "Failed to fetch connections" });
     }
   });
 
   app.post("/api/connections", async (req, res) => {
     try {
-      const response = await fetch("http://localhost:8000/api/connections", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(req.body)
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        return res.status(response.status).json(data);
-      }
-      res.json(data);
+      const connection = await storage.createAdoConnection(req.body);
+      res.json(connection);
     } catch (error) {
+      console.error('Error creating connection:', error);
       res.status(500).json({ message: "Failed to create connection" });
     }
   });
 
   app.post("/api/connections/test", async (req, res) => {
     try {
-      const response = await fetch("http://localhost:8000/api/connections/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(req.body)
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        return res.status(response.status).json(data);
-      }
-      res.json(data);
+      const { organization, personalAccessToken } = req.body;
+      
+      const client = new AzureDevOpsClient(`https://dev.azure.com/${organization}`, personalAccessToken);
+      const isValid = await client.testConnection();
+      
+      res.json({ success: isValid, message: isValid ? 'Connection successful' : 'Connection failed' });
     } catch (error) {
+      console.error('Error testing connection:', error);
       res.status(500).json({ message: "Failed to test connection" });
     }
   });
 
-  // Proxy Projects to Python backend
+  // Projects API
   app.get("/api/projects", async (req, res) => {
     try {
-      const response = await fetch("http://localhost:8000/api/projects");
-      const data = await response.json();
-      res.json(data);
+      const projects = await storage.getProjects();
+      res.json(projects);
     } catch (error) {
+      console.error('Error fetching projects:', error);
       res.status(500).json({ message: "Failed to fetch projects" });
     }
   });
 
   app.post("/api/projects/sync", async (req, res) => {
     try {
-      const response = await fetch("http://localhost:8000/api/projects/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(req.body)
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        return res.status(response.status).json(data);
+      const connections = await storage.getAdoConnections();
+      
+      if (connections.length === 0) {
+        return res.json({ message: 'No active Azure DevOps connection found' });
       }
-      res.json(data);
+
+      const connection = connections[0]; // Use first connection
+      const client = new AzureDevOpsClient(connection.serverUrl, connection.personalAccessToken);
+      const adoProjects = await client.getProjects();
+
+      // Sync projects to storage
+      for (const adoProject of adoProjects) {
+        const existingProject = (await storage.getProjects()).find(p => p.externalId === adoProject.id);
+        
+        if (!existingProject) {
+          await storage.createProject({
+            externalId: adoProject.id,
+            name: adoProject.name,
+            description: adoProject.description || '',
+            processTemplate: adoProject.capabilities?.processTemplate?.templateTypeId || '',
+            sourceControl: adoProject.capabilities?.versioncontrol?.sourceControlType || '',
+            visibility: adoProject.visibility || 'private',
+            status: 'available',
+            connectionId: connection.id,
+            workItemCount: 0,
+            repoCount: 0,
+            testCaseCount: 0,
+            pipelineCount: 0
+          });
+        }
+      }
+
+      res.json({ message: `Synced ${adoProjects.length} projects successfully` });
     } catch (error) {
-      res.status(500).json({ message: "Failed to sync projects" });
+      console.error('Error syncing projects:', error);
+      res.json({ message: 'Failed to sync projects' });
     }
   });
 
