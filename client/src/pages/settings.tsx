@@ -6,19 +6,25 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { TestTube, Save } from "lucide-react";
 
 export default function Settings() {
   const { toast } = useToast();
   const [connectionTesting, setConnectionTesting] = useState(false);
+  const [sourceConnectionStatus, setSourceConnectionStatus] = useState<'unknown' | 'connected' | 'error'>('unknown');
+  const [targetConnectionStatus, setTargetConnectionStatus] = useState<'unknown' | 'connected' | 'error'>('unknown');
   
   const [adoSettings, setAdoSettings] = useState({
-    sourceOrg: "https://dev.azure.com/contoso-source",
+    sourceOrg: "",
     sourcePat: "",
-    targetOrg: "https://dev.azure.com/contoso-target",
+    targetOrg: "",
     targetPat: "",
+    sourceDisplayName: "",
+    targetDisplayName: "",
   });
 
   const [migrationSettings, setMigrationSettings] = useState({
@@ -30,33 +36,162 @@ export default function Settings() {
     migrateAttachments: true,
   });
 
-  const handleTestConnection = async (type: 'source' | 'target') => {
-    setConnectionTesting(true);
-    
-    // Simulate connection test
-    setTimeout(() => {
-      setConnectionTesting(false);
-      toast({
-        title: "Connection Test",
-        description: `${type === 'source' ? 'Source' : 'Target'} connection test successful!`,
+  // Load existing connections on mount
+  const { data: connections = [] } = useQuery({
+    queryKey: ['/api/connections'],
+  });
+
+  useEffect(() => {
+    if (connections.length > 0) {
+      const sourceConn = connections.find((c: any) => c.type === 'source');
+      const targetConn = connections.find((c: any) => c.type === 'target');
+      
+      if (sourceConn) {
+        setAdoSettings(prev => ({
+          ...prev,
+          sourceOrg: sourceConn.organization || "",
+          sourcePat: "", // Don't load PAT for security
+          sourceDisplayName: sourceConn.name || "",
+        }));
+        setSourceConnectionStatus('connected');
+      }
+      
+      if (targetConn) {
+        setAdoSettings(prev => ({
+          ...prev,
+          targetOrg: targetConn.organization || "",
+          targetPat: "", // Don't load PAT for security
+          targetDisplayName: targetConn.name || "",
+        }));
+        setTargetConnectionStatus('connected');
+      }
+    }
+  }, [connections]);
+
+  const saveConnectionMutation = useMutation({
+    mutationFn: async (connectionData: any) => {
+      const response = await fetch('/api/connections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(connectionData),
       });
-    }, 2000);
+      if (!response.ok) throw new Error('Failed to save connection');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/connections'] });
+      toast({
+        title: "Connection Saved",
+        description: "Azure DevOps connection details saved successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Save Failed",
+        description: error.message || "Failed to save connection details.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const testConnectionMutation = useMutation({
+    mutationFn: async ({ organization, patToken }: { organization: string; patToken: string }) => {
+      const response = await fetch('/api/connections/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organization, patToken }),
+      });
+      if (!response.ok) throw new Error('Connection test failed');
+      return response.json();
+    },
+    onSuccess: (data, variables) => {
+      const type = variables.organization === adoSettings.sourceOrg ? 'source' : 'target';
+      if (type === 'source') {
+        setSourceConnectionStatus('connected');
+      } else {
+        setTargetConnectionStatus('connected');
+      }
+      toast({
+        title: "Connection Test Successful",
+        description: `${type === 'source' ? 'Source' : 'Target'} connection is working properly.`,
+      });
+    },
+    onError: (error: any, variables) => {
+      const type = variables.organization === adoSettings.sourceOrg ? 'source' : 'target';
+      if (type === 'source') {
+        setSourceConnectionStatus('error');
+      } else {
+        setTargetConnectionStatus('error');
+      }
+      toast({
+        title: "Connection Test Failed",
+        description: error.message || "Unable to connect to Azure DevOps.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleTestConnection = async (type: 'source' | 'target') => {
+    const organization = type === 'source' ? adoSettings.sourceOrg : adoSettings.targetOrg;
+    const patToken = type === 'source' ? adoSettings.sourcePat : adoSettings.targetPat;
+    
+    if (!organization || !patToken) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter both organization URL and PAT token.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    testConnectionMutation.mutate({ organization, patToken });
   };
 
-  const handleSave = () => {
-    toast({
-      title: "Settings Saved",
-      description: "Your configuration has been saved successfully.",
-    });
+  const handleSave = async () => {
+    const hasSource = adoSettings.sourceOrg && adoSettings.sourcePat;
+    const hasTarget = adoSettings.targetOrg && adoSettings.targetPat;
+    
+    if (!hasSource && !hasTarget) {
+      toast({
+        title: "No Data to Save",
+        description: "Please enter at least one connection configuration.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (hasSource) {
+      await saveConnectionMutation.mutateAsync({
+        name: adoSettings.sourceDisplayName || "Source Organization",
+        organization: adoSettings.sourceOrg,
+        patToken: adoSettings.sourcePat,
+        type: 'source',
+        isActive: true,
+      });
+    }
+
+    if (hasTarget) {
+      await saveConnectionMutation.mutateAsync({
+        name: adoSettings.targetDisplayName || "Target Organization",
+        organization: adoSettings.targetOrg,
+        patToken: adoSettings.targetPat,
+        type: 'target',
+        isActive: true,
+      });
+    }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Settings</h2>
-        <Button onClick={handleSave} className="bg-azure-blue hover:bg-azure-dark">
+        <Button 
+          onClick={handleSave} 
+          disabled={saveConnectionMutation.isPending}
+          className="bg-azure-blue hover:bg-azure-dark"
+        >
           <Save className="h-4 w-4 mr-2" />
-          Save Settings
+          {saveConnectionMutation.isPending ? "Saving..." : "Save Settings"}
         </Button>
       </div>
 
@@ -74,10 +209,26 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   Source Organization
-                  <Badge className="bg-green-100 text-green-800">Connected</Badge>
+                  <Badge className={
+                    sourceConnectionStatus === 'connected' ? 'bg-green-100 text-green-800' :
+                    sourceConnectionStatus === 'error' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-800'
+                  }>
+                    {sourceConnectionStatus === 'connected' ? 'Connected' :
+                     sourceConnectionStatus === 'error' ? 'Error' : 'Not Configured'}
+                  </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="source-display-name">Display Name</Label>
+                  <Input
+                    id="source-display-name"
+                    value={adoSettings.sourceDisplayName}
+                    onChange={(e) => setAdoSettings({ ...adoSettings, sourceDisplayName: e.target.value })}
+                    placeholder="Source Organization"
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="source-org">Organization URL</Label>
                   <Input
@@ -100,11 +251,11 @@ export default function Settings() {
                 <Button 
                   variant="outline" 
                   onClick={() => handleTestConnection('source')}
-                  disabled={connectionTesting}
+                  disabled={testConnectionMutation.isPending}
                   className="w-full"
                 >
                   <TestTube className="h-4 w-4 mr-2" />
-                  {connectionTesting ? "Testing..." : "Test Connection"}
+                  {testConnectionMutation.isPending ? "Testing..." : "Test Connection"}
                 </Button>
               </CardContent>
             </Card>
@@ -113,10 +264,26 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   Target Organization
-                  <Badge className="bg-green-100 text-green-800">Connected</Badge>
+                  <Badge className={
+                    targetConnectionStatus === 'connected' ? 'bg-green-100 text-green-800' :
+                    targetConnectionStatus === 'error' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-800'
+                  }>
+                    {targetConnectionStatus === 'connected' ? 'Connected' :
+                     targetConnectionStatus === 'error' ? 'Error' : 'Not Configured'}
+                  </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="target-display-name">Display Name</Label>
+                  <Input
+                    id="target-display-name"
+                    value={adoSettings.targetDisplayName}
+                    onChange={(e) => setAdoSettings({ ...adoSettings, targetDisplayName: e.target.value })}
+                    placeholder="Target Organization"
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="target-org">Organization URL</Label>
                   <Input
@@ -139,11 +306,11 @@ export default function Settings() {
                 <Button 
                   variant="outline" 
                   onClick={() => handleTestConnection('target')}
-                  disabled={connectionTesting}
+                  disabled={testConnectionMutation.isPending}
                   className="w-full"
                 >
                   <TestTube className="h-4 w-4 mr-2" />
-                  {connectionTesting ? "Testing..." : "Test Connection"}
+                  {testConnectionMutation.isPending ? "Testing..." : "Test Connection"}
                 </Button>
               </CardContent>
             </Card>
