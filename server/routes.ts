@@ -229,7 +229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const connection = connections[0]; // Use first connection
-      const client = new AzureDevOpsClient(connection.serverUrl, connection.personalAccessToken);
+      const client = new AzureDevOpsClient(connection.baseUrl, connection.patToken);
       const adoProjects = await client.getProjects();
 
       // Sync projects to storage
@@ -258,6 +258,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error syncing projects:', error);
       res.json({ message: 'Failed to sync projects' });
+    }
+  });
+
+  // Get statistics
+  app.get("/api/statistics", async (req, res) => {
+    try {
+      const projects = await storage.getProjects();
+      const statistics = {
+        totalProjects: projects.length,
+        selectedProjects: projects.filter(p => p.status === 'selected').length,
+        inProgressProjects: projects.filter(p => p.status === 'in_progress').length,
+        migratedProjects: projects.filter(p => p.status === 'migrated').length
+      };
+      res.json(statistics);
+    } catch (error) {
+      console.error('Error fetching statistics:', error);
+      res.status(500).json({ message: 'Failed to fetch statistics' });
     }
   });
 
