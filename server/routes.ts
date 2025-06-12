@@ -173,11 +173,12 @@ class AzureDevOpsClient {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // ADO Connections
+  // Proxy ADO Connections to Python backend
   app.get("/api/connections", async (req, res) => {
     try {
-      const connections = await storage.getAdoConnections();
-      res.json(connections);
+      const response = await fetch("http://localhost:5000/api/connections");
+      const data = await response.json();
+      res.json(data);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch connections" });
     }
@@ -185,42 +186,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/connections", async (req, res) => {
     try {
-      const validatedData = insertAdoConnectionSchema.parse(req.body);
-      const connection = await storage.createAdoConnection(validatedData);
-      res.status(201).json(connection);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ message: "Validation error", errors: error.errors });
-      } else {
-        res.status(500).json({ message: "Failed to create connection" });
+      const response = await fetch("http://localhost:5000/api/connections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req.body)
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return res.status(response.status).json(data);
       }
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create connection" });
     }
   });
 
-  app.post("/api/connections/:id/test", async (req, res) => {
+  app.post("/api/connections/test", async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const connection = await storage.getAdoConnection(id);
-      
-      if (!connection) {
-        return res.status(404).json({ message: "Connection not found" });
+      const response = await fetch("http://localhost:5000/api/connections/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req.body)
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return res.status(response.status).json(data);
       }
-
-      const client = new AzureDevOpsClient(connection.baseUrl, connection.patToken);
-      const isValid = await client.testConnection();
-      
-      res.json({ valid: isValid });
+      res.json(data);
     } catch (error) {
       res.status(500).json({ message: "Failed to test connection" });
     }
   });
 
-  // Projects
+  // Proxy Projects to Python backend
   app.get("/api/projects", async (req, res) => {
     try {
-      const connectionId = req.query.connectionId ? parseInt(req.query.connectionId as string) : undefined;
-      const projects = await storage.getProjects(connectionId);
-      res.json(projects);
+      const response = await fetch("http://localhost:5000/api/projects");
+      const data = await response.json();
+      res.json(data);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch projects" });
     }
@@ -228,37 +231,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/projects/sync", async (req, res) => {
     try {
-      const { connectionId } = req.body;
-      const connection = await storage.getAdoConnection(connectionId);
-      
-      if (!connection) {
-        return res.status(404).json({ message: "Connection not found" });
+      const response = await fetch("http://localhost:5000/api/projects/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req.body)
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return res.status(response.status).json(data);
       }
-
-      const client = new AzureDevOpsClient(connection.baseUrl, connection.patToken);
-      const adoProjects = await client.getProjects();
-
-      const syncedProjects = [];
-      for (const adoProject of adoProjects) {
-        const project = await storage.createProject({
-          externalId: adoProject.id,
-          name: adoProject.name,
-          description: adoProject.description,
-          processTemplate: adoProject.processTemplate,
-          sourceControl: adoProject.sourceControl,
-          visibility: adoProject.visibility,
-          createdDate: adoProject.createdDate,
-          status: "ready",
-          connectionId,
-          workItemCount: adoProject.workItemCount,
-          repoCount: adoProject.repoCount,
-          testCaseCount: adoProject.testCaseCount,
-          pipelineCount: adoProject.pipelineCount,
-        });
-        syncedProjects.push(project);
-      }
-
-      res.json(syncedProjects);
+      res.json(data);
     } catch (error) {
       res.status(500).json({ message: "Failed to sync projects" });
     }

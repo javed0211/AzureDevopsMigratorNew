@@ -220,7 +220,7 @@ async def create_connection(connection_data: dict):
         
         # Extract data with fallbacks for different field names
         name = connection_data.get('name', '')
-        organization = connection_data.get('organization', '').replace('https://dev.azure.com/', '')
+        organization = connection_data.get('organization', '').replace('https://dev.azure.com/', '').strip('/')
         pat_token = connection_data.get('patToken') or connection_data.get('pat_token', '')
         conn_type = connection_data.get('type', 'source')
         is_active = connection_data.get('isActive', connection_data.get('is_active', True))
