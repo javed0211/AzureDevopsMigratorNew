@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import base64
 import json
+from schemas import ConnectionResponse
 
 try:
     import psycopg2
@@ -253,7 +254,8 @@ async def create_connection(connection_data: dict):
             
             conn.commit()
             result = cursor.fetchone()
-            return dict(result)
+            return ConnectionResponse(**result)
+            # return dict(result)
         finally:
             conn.close()
     except Exception as e:
@@ -334,3 +336,18 @@ async def serve_frontend(full_path: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=5000)
+
+@app.post("/api/connections/test")
+async def test_connection(data: dict):
+    try:
+        organization = data.get("organization", "").replace("https://dev.azure.com/", "").strip("/")
+        pat_token = data.get("patToken", "")
+        client = AzureDevOpsClient(organization, pat_token)
+        projects = await client.get_projects()
+        if projects:
+            return {"success": True}
+        else:
+            raise HTTPException(status_code=400, detail="Invalid credentials or empty response")
+    except Exception as e:
+        logger.error(f"Test connection failed: {e}")
+        raise HTTPException(status_code=400, detail="Failed to test Azure DevOps connection")

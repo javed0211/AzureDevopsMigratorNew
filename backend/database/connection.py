@@ -6,6 +6,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from .models import Base
 
 DATABASE_URL = os.getenv('DATABASE_URL')
 
@@ -24,6 +25,14 @@ def get_db_session():
     """Get a SQLAlchemy database session"""
     return SessionLocal()
 
+def get_db():
+    """FastAPI-compatible database dependency"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 def test_connection():
     """Test database connection"""
     try:
@@ -36,3 +45,7 @@ def test_connection():
     except Exception as e:
         print(f"Database connection failed: {e}")
         return False
+
+def create_tables():
+    """Create tables from models"""
+    Base.metadata.create_all(bind=engine)

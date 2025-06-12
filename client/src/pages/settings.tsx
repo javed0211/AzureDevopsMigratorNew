@@ -12,12 +12,20 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { TestTube, Save } from "lucide-react";
 
+type AdoConnection = {
+  id: number;
+  name: string;
+  organization: string;
+  type: "source" | "target";
+  isActive: boolean;
+};
+
 export default function Settings() {
   const { toast } = useToast();
   const [connectionTesting, setConnectionTesting] = useState(false);
   const [sourceConnectionStatus, setSourceConnectionStatus] = useState<'unknown' | 'connected' | 'error'>('unknown');
   const [targetConnectionStatus, setTargetConnectionStatus] = useState<'unknown' | 'connected' | 'error'>('unknown');
-  
+
   const [adoSettings, setAdoSettings] = useState({
     sourceOrg: "",
     sourcePat: "",
@@ -36,37 +44,38 @@ export default function Settings() {
     migrateAttachments: true,
   });
 
-  // Load existing connections on mount
-  const { data: connections = [] } = useQuery({
+  // ✅ Fix: Use proper type for useQuery
+  const { data: connections = [] } = useQuery<AdoConnection[]>({
     queryKey: ['/api/connections'],
   });
 
   useEffect(() => {
     if (connections.length > 0) {
-      const sourceConn = connections.find((c: any) => c.type === 'source');
-      const targetConn = connections.find((c: any) => c.type === 'target');
-      
+      const sourceConn = connections.find((c) => c.type === 'source');
+      const targetConn = connections.find((c) => c.type === 'target');
+
       if (sourceConn) {
         setAdoSettings(prev => ({
           ...prev,
           sourceOrg: sourceConn.organization || "",
-          sourcePat: "", // Don't load PAT for security
+          sourcePat: "",
           sourceDisplayName: sourceConn.name || "",
         }));
         setSourceConnectionStatus('connected');
       }
-      
+
       if (targetConn) {
         setAdoSettings(prev => ({
           ...prev,
           targetOrg: targetConn.organization || "",
-          targetPat: "", // Don't load PAT for security
+          targetPat: "",
           targetDisplayName: targetConn.name || "",
         }));
         setTargetConnectionStatus('connected');
       }
     }
   }, [connections]);
+
 
   const saveConnectionMutation = useMutation({
     mutationFn: async (connectionData: any) => {
@@ -134,7 +143,7 @@ export default function Settings() {
   const handleTestConnection = async (type: 'source' | 'target') => {
     const organization = type === 'source' ? adoSettings.sourceOrg : adoSettings.targetOrg;
     const patToken = type === 'source' ? adoSettings.sourcePat : adoSettings.targetPat;
-    
+
     if (!organization || !patToken) {
       toast({
         title: "Missing Information",
@@ -150,7 +159,7 @@ export default function Settings() {
   const handleSave = async () => {
     const hasSource = adoSettings.sourceOrg && adoSettings.sourcePat;
     const hasTarget = adoSettings.targetOrg && adoSettings.targetPat;
-    
+
     if (!hasSource && !hasTarget) {
       toast({
         title: "No Data to Save",
@@ -185,8 +194,8 @@ export default function Settings() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Settings</h2>
-        <Button 
-          onClick={handleSave} 
+        <Button
+          onClick={handleSave}
           disabled={saveConnectionMutation.isPending}
           className="bg-azure-blue hover:bg-azure-dark"
         >
@@ -202,7 +211,7 @@ export default function Settings() {
           <TabsTrigger value="migration">Migration Options</TabsTrigger>
           <TabsTrigger value="logging">Logging</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="connections" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -211,11 +220,11 @@ export default function Settings() {
                   Source Organization
                   <Badge className={
                     sourceConnectionStatus === 'connected' ? 'bg-green-100 text-green-800' :
-                    sourceConnectionStatus === 'error' ? 'bg-red-100 text-red-800' :
-                    'bg-gray-100 text-gray-800'
+                      sourceConnectionStatus === 'error' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
                   }>
                     {sourceConnectionStatus === 'connected' ? 'Connected' :
-                     sourceConnectionStatus === 'error' ? 'Error' : 'Not Configured'}
+                      sourceConnectionStatus === 'error' ? 'Error' : 'Not Configured'}
                   </Badge>
                 </CardTitle>
               </CardHeader>
@@ -248,8 +257,8 @@ export default function Settings() {
                     placeholder="Enter PAT token"
                   />
                 </div>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => handleTestConnection('source')}
                   disabled={testConnectionMutation.isPending}
                   className="w-full"
@@ -259,18 +268,18 @@ export default function Settings() {
                 </Button>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   Target Organization
                   <Badge className={
                     targetConnectionStatus === 'connected' ? 'bg-green-100 text-green-800' :
-                    targetConnectionStatus === 'error' ? 'bg-red-100 text-red-800' :
-                    'bg-gray-100 text-gray-800'
+                      targetConnectionStatus === 'error' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
                   }>
                     {targetConnectionStatus === 'connected' ? 'Connected' :
-                     targetConnectionStatus === 'error' ? 'Error' : 'Not Configured'}
+                      targetConnectionStatus === 'error' ? 'Error' : 'Not Configured'}
                   </Badge>
                 </CardTitle>
               </CardHeader>
@@ -303,8 +312,8 @@ export default function Settings() {
                     placeholder="Enter PAT token"
                   />
                 </div>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => handleTestConnection('target')}
                   disabled={testConnectionMutation.isPending}
                   className="w-full"
@@ -316,7 +325,7 @@ export default function Settings() {
             </Card>
           </div>
         </TabsContent>
-        
+
         <TabsContent value="storage" className="space-y-6">
           <Card>
             <CardHeader>
@@ -351,7 +360,7 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="migration" className="space-y-6">
           <Card>
             <CardHeader>
@@ -367,12 +376,12 @@ export default function Settings() {
                   <Switch
                     id="include-work-items"
                     checked={migrationSettings.includeWorkItems}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       setMigrationSettings({ ...migrationSettings, includeWorkItems: checked })
                     }
                   />
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div>
                     <Label htmlFor="include-repos">Include Repositories</Label>
@@ -381,12 +390,12 @@ export default function Settings() {
                   <Switch
                     id="include-repos"
                     checked={migrationSettings.includeRepositories}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       setMigrationSettings({ ...migrationSettings, includeRepositories: checked })
                     }
                   />
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div>
                     <Label htmlFor="include-test-cases">Include Test Cases</Label>
@@ -395,12 +404,12 @@ export default function Settings() {
                   <Switch
                     id="include-test-cases"
                     checked={migrationSettings.includeTestCases}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       setMigrationSettings({ ...migrationSettings, includeTestCases: checked })
                     }
                   />
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div>
                     <Label htmlFor="include-pipelines">Include Pipelines</Label>
@@ -409,12 +418,12 @@ export default function Settings() {
                   <Switch
                     id="include-pipelines"
                     checked={migrationSettings.includePipelines}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       setMigrationSettings({ ...migrationSettings, includePipelines: checked })
                     }
                   />
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div>
                     <Label htmlFor="preserve-history">Preserve History</Label>
@@ -423,12 +432,12 @@ export default function Settings() {
                   <Switch
                     id="preserve-history"
                     checked={migrationSettings.preserveHistory}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       setMigrationSettings({ ...migrationSettings, preserveHistory: checked })
                     }
                   />
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div>
                     <Label htmlFor="migrate-attachments">Migrate Attachments</Label>
@@ -437,7 +446,7 @@ export default function Settings() {
                   <Switch
                     id="migrate-attachments"
                     checked={migrationSettings.migrateAttachments}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       setMigrationSettings({ ...migrationSettings, migrateAttachments: checked })
                     }
                   />
@@ -446,7 +455,7 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="logging" className="space-y-6">
           <Card>
             <CardHeader>

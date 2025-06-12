@@ -22,29 +22,32 @@ export default function ProjectSelection() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Fetch statistics
-  const { data: statistics } = useQuery<{
-    totalProjects: number;
-    selectedProjects: number;
-    inProgressProjects: number;
-    migratedProjects: number;
-  }>({
+  const {
+    data: statistics,
+    refetch: refetchStatistics
+  } = useQuery<{ totalProjects: number; selectedProjects: number; inProgressProjects: number; migratedProjects: number }>({
     queryKey: ["/api/statistics"],
     refetchInterval: 5000,
+    enabled: false,
   });
-
-  // Fetch projects
-  const { data: projects, isLoading: projectsLoading } = useQuery<Project[]>({
+  
+  const {
+    data: projects,
+    isLoading: projectsLoading,
+    refetch: refetchProjects
+  } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
     refetchInterval: 5000,
+    enabled: false,
   });
+  
 
   // Sync projects mutation
   const syncProjectsMutation = useMutation({
     mutationFn: () => api.projects.sync(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/statistics"] });
+    onSuccess: async () => {
+      await refetchProjects();
+      await refetchStatistics();
       toast({
         title: "Projects Synced",
         description: "Projects have been synchronized from Azure DevOps.",
@@ -58,6 +61,7 @@ export default function ProjectSelection() {
       });
     },
   });
+  
 
   // Bulk select mutation
   const bulkSelectMutation = useMutation({
@@ -83,10 +87,10 @@ export default function ProjectSelection() {
   // Filter projects
   const filteredProjects = (projects || []).filter((project: Project) => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (project.description?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
+      (project.description?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
     const matchesProcess = processFilter === "all" || project.processTemplate.toLowerCase() === processFilter.toLowerCase();
     const matchesVisibility = visibilityFilter === "all" || project.visibility.toLowerCase() === visibilityFilter.toLowerCase();
-    
+
     return matchesSearch && matchesProcess && matchesVisibility;
   });
 
@@ -187,7 +191,7 @@ export default function ProjectSelection() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
