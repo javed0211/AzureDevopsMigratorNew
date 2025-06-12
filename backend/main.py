@@ -200,6 +200,17 @@ async def sync_projects():
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+        
+        # Get Azure DevOps PAT from environment and update database
+        azure_pat = os.getenv("AZURE_DEVOPS_PAT")
+        if azure_pat:
+            cursor.execute("""
+                UPDATE ado_connections 
+                SET pat_token = %s 
+                WHERE organization = 'DevCGAzureDevOps'
+            """, (azure_pat,))
+            conn.commit()
+        
         cursor.execute("SELECT organization, pat_token FROM ado_connections WHERE is_active = true LIMIT 1")
         connection = cursor.fetchone()
         
