@@ -256,6 +256,14 @@ export default function ProjectSelection() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              <Button
+                onClick={() => syncProjectsMutation.mutate()}
+                disabled={syncProjectsMutation.isPending}
+                className="bg-azure-blue hover:bg-azure-blue/90 text-white"
+              >
+                <Cloud className="h-4 w-4 mr-2" />
+                {syncProjectsMutation.isPending ? "Syncing..." : "Sync Projects"}
+              </Button>
               <Select value={processFilter} onValueChange={setProcessFilter}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="All Process Types" />
