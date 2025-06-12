@@ -173,25 +173,6 @@ class AzureDevOpsClient {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Start Python FastAPI backend
-  const { spawn } = await import('child_process');
-  
-  console.log('Starting Python FastAPI backend on port 8000...');
-  const pythonProcess = spawn('python', ['-m', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', '8000'], {
-    cwd: './backend',
-    stdio: 'pipe'
-  });
-  
-  pythonProcess.stdout?.on('data', (data: Buffer) => {
-    console.log(`[python] ${data.toString().trim()}`);
-  });
-  
-  pythonProcess.stderr?.on('data', (data: Buffer) => {
-    console.log(`[python error] ${data.toString().trim()}`);
-  });
-  
-  // Wait for Python backend to start
-  await new Promise(resolve => setTimeout(resolve, 5000));
   
   // Proxy ADO Connections to Python backend
   app.get("/api/connections", async (req, res) => {

@@ -34,7 +34,7 @@ export default function ProjectSelection() {
   });
 
   // Fetch projects
-  const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
+  const { data: projects, isLoading: projectsLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
     refetchInterval: 5000,
   });
@@ -75,13 +75,13 @@ export default function ProjectSelection() {
 
   // Initialize projects on component mount
   useEffect(() => {
-    if (projects.length === 0) {
+    if (projects && projects.length === 0) {
       syncProjectsMutation.mutate();
     }
-  }, []);
+  }, [projects]);
 
   // Filter projects
-  const filteredProjects = projects.filter((project: Project) => {
+  const filteredProjects = (projects || []).filter((project: Project) => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (project.description?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
     const matchesProcess = processFilter === "all" || project.processTemplate.toLowerCase() === processFilter.toLowerCase();
