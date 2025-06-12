@@ -1,0 +1,51 @@
+1. Project Selection Page Improvements
+
+Duplicate Projects: Prevent duplicate projects from being displayed. Currently, refreshing the page adds the same projects again.
+Project Fetching Logic: Remove automatic project fetching on page load. Instead:
+Add a "Fetch Projects" button to manually load projects.
+Add a "Refresh Projects" button for manual refresh.
+ADO Organisation Info: Display the name of the connected Azure DevOps Organisation on the Project Selection page.
+Pagination Fixes:
+Pagination is broken — clicking on page 2 or 3 does nothing.
+Page says "Showing 1 to 10 of 36 results" but shows all 36 projects on one page.
+Total count shown above does not match the actual displayed list.
+Fix the pagination to correctly reflect the number of projects and navigate between pages properly.
+2. Extraction Overview Enhancements
+
+Remove Dummy Data: Currently showing hardcoded/dummy values — remove them.
+Dynamic Tabs for Data Extraction: Add tabs for each extractable artifact with actual extraction controls:
+Queries – Show and extract actual saved/shared queries.
+Boards – Columns, Swimlanes, Work Item states.
+Pipelines – YAML/classic pipelines, Environments, Releases, Library, Task Groups, Deployment Groups.
+Test Plan – Configurations, Test Runs, Test Results, Test Points.
+Dashboards – Team dashboards and widgets.
+Work Items – Metadata, Comments, Attachments, Revisions, Relationships, Tags.
+Project – Process, Administrators, Teams.
+Work Item Links
+Test Suites
+Project Details and Configurations
+Repositories – Files, Commits, Pull Requests.
+Since users can select multiple projects for extraction, each tab must show data grouped by project, and allow per-project extraction.
+3. Migration Page Enhancements
+
+Remove Dummy Data and populate the page with real extracted data.
+Source Organisation: Show the actual Azure DevOps organisation(s) from where the data was extracted — support multiple source organisations.
+Migration Queue Summary:
+Expand current summary to include all artifact types.
+Clearly indicate if there are more items not yet shown (pagination or overflow summary).
+Show counts per artifact and project-wise breakdown.
+4. Audit & Logs Page
+
+Remove Hardcoded Logs: Replace with actual runtime logs.
+Log the following:
+When projects are fetched.
+When extraction starts/ends.
+Errors/warnings.
+Summary of items extracted or skipped.
+Support detailed logs per action.
+5. Database & Backend
+
+Store all extracted and migrated data in a PostgreSQL database.
+Use Python for the backend:
+Build API endpoints to handle: extraction, transformation, migration, logging, and audit.
+Structure backend to support asynchronous jobs and retries for long-running tasks.
