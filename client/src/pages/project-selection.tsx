@@ -23,7 +23,7 @@ export default function ProjectSelection() {
   const { toast } = useToast();
 
   // Fetch statistics
-  const { data: statistics = {} } = useQuery<{
+  const { data: statistics } = useQuery<{
     totalProjects: number;
     selectedProjects: number;
     inProgressProjects: number;
