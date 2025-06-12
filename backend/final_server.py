@@ -332,11 +332,11 @@ if __name__ == "__main__":
     # Final cleanup before starting
     cleanup_node_processes()
     
-    # Start the server
+    # Start the server on port 8000 to avoid conflict with Node.js
     uvicorn.run(
         app, 
         host="0.0.0.0", 
-        port=5000,
+        port=8000,
         log_level="info",
         access_log=True
     )
