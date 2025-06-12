@@ -1,6 +1,6 @@
 """
 Azure DevOps Migration Tool - Python FastAPI Backend
-Complete replacement for Node.js backend
+Primary backend server replacing Node.js
 """
 import os
 import logging
@@ -8,17 +8,23 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+import base64
+import json
 
 try:
     import psycopg2
     from psycopg2.extras import RealDictCursor
 except ImportError:
-    print("psycopg2 not found, using alternative approach")
+    logging.warning("psycopg2 not available")
     psycopg2 = None
 
-import asyncio
-import aiohttp
+try:
+    import aiohttp
+except ImportError:
+    logging.warning("aiohttp not available")
+    aiohttp = None
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -35,6 +41,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve static files (frontend)
+try:
+    import os
+    static_dir = os.path.join(os.path.dirname(__file__), "..", "client", "dist")
+    if os.path.exists(static_dir):
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+        logger.info(f"Serving static files from {static_dir}")
+except Exception as e:
+    logger.warning(f"Could not mount static files: {e}")
 
 def get_db_connection():
     """Get database connection"""
@@ -295,6 +311,26 @@ async def sync_projects():
         logger.error(f"Error syncing projects: {e}")
         return {"message": "Failed to sync projects"}
 
+# Serve frontend files
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    """Serve frontend files"""
+    try:
+        import os
+        from fastapi.responses import FileResponse
+        
+        # Serve index.html for SPA routes
+        frontend_dir = os.path.join(os.path.dirname(__file__), "..", "client")
+        index_path = os.path.join(frontend_dir, "index.html")
+        
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        else:
+            return {"message": "Frontend not built. Run 'npm run build' in client directory."}
+    except Exception as e:
+        logger.error(f"Error serving frontend: {e}")
+        return {"message": "Frontend serving error"}
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=5000)
