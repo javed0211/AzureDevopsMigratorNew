@@ -491,24 +491,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Statistics
+  // Proxy Statistics to Python backend
   app.get("/api/statistics", async (req, res) => {
     try {
-      const projects = await storage.getProjects();
-      const jobs = await storage.getMigrationJobs();
-      
-      const stats = {
-        totalProjects: projects.length,
-        selectedProjects: projects.filter(p => p.status === "selected").length,
-        inProgressProjects: projects.filter(p => ["extracting", "migrating"].includes(p.status)).length,
-        migratedProjects: projects.filter(p => p.status === "migrated").length,
-        totalJobs: jobs.length,
-        runningJobs: jobs.filter(j => j.status === "running").length,
-        completedJobs: jobs.filter(j => j.status === "completed").length,
-        failedJobs: jobs.filter(j => j.status === "failed").length,
-      };
-      
-      res.json(stats);
+      const response = await fetch("http://localhost:5000/api/statistics");
+      const data = await response.json();
+      res.json(data);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch statistics" });
     }
