@@ -292,8 +292,48 @@ async def sync_projects():
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, organization, pat_token 
+            FROM ado_connections 
+            WHERE is_active = true AND type = 'source' 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        """)
+        connection = cursor.fetchone()
         
-        # Get Azure DevOps PAT from environment and update database
+        if not connection:
+            raise HTTPException(status_code=404, detail="No active source connection found")
+        
+        client = AzureDevOpsClient(connection['organization'], connection['pat_token'])
+        projects = await client.get_projects()
+        
+        # Save projects to database
+        for project in projects:
+            cursor.execute("""
+                INSERT INTO projects (external_id, name, description, created_date, status, connection_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (external_id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    description = EXCLUDED.description,
+                    connection_id = EXCLUDED.connection_id
+            """, (
+                project['id'],
+                project['name'],
+                project.get('description', ''),
+                datetime.fromisoformat(project['lastUpdateTime'].replace('Z', '+00:00')) if project.get('lastUpdateTime') else None,
+                'ready',
+                connection['id']
+            ))
+        
+        conn.commit()
+        return {"message": f"Synced {len(projects)} projects successfully"}
+        
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Error syncing projects: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
         azure_pat = os.getenv("AZURE_DEVOPS_PAT")
         if azure_pat:
             cursor.execute("""

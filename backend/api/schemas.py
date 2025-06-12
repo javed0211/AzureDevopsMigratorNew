@@ -5,25 +5,16 @@ from datetime import datetime
 class ConnectionCreate(BaseModel):
     name: str
     organization: str
-    pat_token: str
-    patToken: Optional[str] = None  # Alternative field name for frontend compatibility
+    patToken: str  # Use frontend field name
     type: Optional[str] = "source"
-    is_active: Optional[bool] = True
-    isActive: Optional[bool] = None  # Alternative field name for frontend compatibility
-    
-    def __init__(self, **data):
-        # Handle alternative field names
-        if 'patToken' in data and 'pat_token' not in data:
-            data['pat_token'] = data['patToken']
-        if 'isActive' in data and 'is_active' not in data:
-            data['is_active'] = data['isActive']
-        super().__init__(**data)
+    isActive: Optional[bool] = True  # Use frontend field name
 
 class ConnectionResponse(BaseModel):
     id: int
     name: str
     organization: str
     base_url: str
+    type: str
     is_active: bool
     created_at: datetime
     
