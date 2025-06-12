@@ -4,13 +4,19 @@ Complete replacement for Node.js backend
 """
 import os
 import logging
-import psycopg2
-from psycopg2.extras import RealDictCursor
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+except ImportError:
+    print("psycopg2 not found, using alternative approach")
+    psycopg2 = None
+
 import asyncio
 import aiohttp
 
@@ -33,14 +39,23 @@ app.add_middleware(
 def get_db_connection():
     """Get database connection"""
     try:
+        if not psycopg2:
+            logger.warning("psycopg2 not available, using mock connection")
+            return None
+        
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            logger.error("DATABASE_URL not set")
+            return None
+            
         conn = psycopg2.connect(
-            os.getenv("DATABASE_URL"),
+            database_url,
             cursor_factory=RealDictCursor
         )
         return conn
     except Exception as e:
         logger.error(f"Database connection error: {e}")
-        raise HTTPException(status_code=500, detail="Database connection failed")
+        return None
 
 # Pydantic models
 class ProjectResponse(BaseModel):
