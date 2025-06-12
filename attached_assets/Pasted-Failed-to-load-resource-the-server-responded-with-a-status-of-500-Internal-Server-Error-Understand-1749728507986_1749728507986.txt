@@ -1,0 +1,349 @@
+Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+/api/projects:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+/api/projects:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+/api/statistics:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+utils.js:1 
+            
+            
+           Failed to load resource: net::ERR_FILE_NOT_FOUNDUnderstand this error
+heuristicsRedefinitions.js:1 
+            
+            
+           Failed to load resource: net::ERR_FILE_NOT_FOUNDUnderstand this error
+extensionState.js:1 
+            
+            
+           Failed to load resource: net::ERR_FILE_NOT_FOUNDUnderstand this error
+utils.js:1 
+            
+            
+           Failed to load resource: net::ERR_FILE_NOT_FOUNDUnderstand this error
+extensionState.js:1 
+            
+            
+           Failed to load resource: net::ERR_FILE_NOT_FOUNDUnderstand this error
+heuristicsRedefinitions.js:1 
+            
+            
+           Failed to load resource: net::ERR_FILE_NOT_FOUNDUnderstand this error
+/api/projects:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+/api/statistics:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+/api/projects/sync:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+/api/projects:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+/api/statistics:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+queryClient.ts:32 
+            
+            
+           GET https://3134776a-c467-4c9c-a3e8-f25a2ec4ccb6-00-12v92n7vzmxxb.kirk.replit.dev/api/projects 500 (Internal Server Error)
+(anonymous) @ queryClient.ts:32
+fetchFn @ @tanstack_react-query.js?v=46dcdf47:840
+run @ @tanstack_react-query.js?v=46dcdf47:494
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245Understand this error
+queryClient.ts:32 
+            
+            
+           GET https://3134776a-c467-4c9c-a3e8-f25a2ec4ccb6-00-12v92n7vzmxxb.kirk.replit.dev/api/statistics 500 (Internal Server Error)
+(anonymous) @ queryClient.ts:32
+fetchFn @ @tanstack_react-query.js?v=46dcdf47:840
+run @ @tanstack_react-query.js?v=46dcdf47:494
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245Understand this error
+queryClient.ts:32 
+            
+            
+           GET https://3134776a-c467-4c9c-a3e8-f25a2ec4ccb6-00-12v92n7vzmxxb.kirk.replit.dev/api/projects 500 (Internal Server Error)
+(anonymous) @ queryClient.ts:32
+fetchFn @ @tanstack_react-query.js?v=46dcdf47:840
+run @ @tanstack_react-query.js?v=46dcdf47:494
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245
+setInterval
+updateRefetchInterval_fn @ @tanstack_react-query.js?v=46dcdf47:2243
+updateTimers_fn @ @tanstack_react-query.js?v=46dcdf47:2250
+onQueryUpdate @ @tanstack_react-query.js?v=46dcdf47:2206
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:998
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:997
+batch @ @tanstack_react-query.js?v=46dcdf47:583
+dispatch_fn @ @tanstack_react-query.js?v=46dcdf47:996
+onError @ @tanstack_react-query.js?v=46dcdf47:861
+reject @ @tanstack_react-query.js?v=46dcdf47:465
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:508
+Promise.catch
+run @ @tanstack_react-query.js?v=46dcdf47:498
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245Understand this error
+queryClient.ts:32 
+            
+            
+           GET https://3134776a-c467-4c9c-a3e8-f25a2ec4ccb6-00-12v92n7vzmxxb.kirk.replit.dev/api/statistics 500 (Internal Server Error)
+(anonymous) @ queryClient.ts:32
+fetchFn @ @tanstack_react-query.js?v=46dcdf47:840
+run @ @tanstack_react-query.js?v=46dcdf47:494
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245
+setInterval
+updateRefetchInterval_fn @ @tanstack_react-query.js?v=46dcdf47:2243
+updateTimers_fn @ @tanstack_react-query.js?v=46dcdf47:2250
+onQueryUpdate @ @tanstack_react-query.js?v=46dcdf47:2206
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:998
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:997
+batch @ @tanstack_react-query.js?v=46dcdf47:583
+dispatch_fn @ @tanstack_react-query.js?v=46dcdf47:996
+onError @ @tanstack_react-query.js?v=46dcdf47:861
+reject @ @tanstack_react-query.js?v=46dcdf47:465
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:508
+Promise.catch
+run @ @tanstack_react-query.js?v=46dcdf47:498
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245Understand this error
+queryClient.ts:32 
+            
+            
+           GET https://3134776a-c467-4c9c-a3e8-f25a2ec4ccb6-00-12v92n7vzmxxb.kirk.replit.dev/api/projects 500 (Internal Server Error)
+(anonymous) @ queryClient.ts:32
+fetchFn @ @tanstack_react-query.js?v=46dcdf47:840
+run @ @tanstack_react-query.js?v=46dcdf47:494
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245
+setInterval
+updateRefetchInterval_fn @ @tanstack_react-query.js?v=46dcdf47:2243
+updateTimers_fn @ @tanstack_react-query.js?v=46dcdf47:2250
+onQueryUpdate @ @tanstack_react-query.js?v=46dcdf47:2206
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:998
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:997
+batch @ @tanstack_react-query.js?v=46dcdf47:583
+dispatch_fn @ @tanstack_react-query.js?v=46dcdf47:996
+onError @ @tanstack_react-query.js?v=46dcdf47:861
+reject @ @tanstack_react-query.js?v=46dcdf47:465
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:508
+Promise.catch
+run @ @tanstack_react-query.js?v=46dcdf47:498
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245
+setInterval
+updateRefetchInterval_fn @ @tanstack_react-query.js?v=46dcdf47:2243
+updateTimers_fn @ @tanstack_react-query.js?v=46dcdf47:2250
+onQueryUpdate @ @tanstack_react-query.js?v=46dcdf47:2206
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:998
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:997
+batch @ @tanstack_react-query.js?v=46dcdf47:583
+dispatch_fn @ @tanstack_react-query.js?v=46dcdf47:996
+onError @ @tanstack_react-query.js?v=46dcdf47:861
+reject @ @tanstack_react-query.js?v=46dcdf47:465
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:508
+Promise.catch
+run @ @tanstack_react-query.js?v=46dcdf47:498
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245Understand this error
+queryClient.ts:32 
+            
+            
+           GET https://3134776a-c467-4c9c-a3e8-f25a2ec4ccb6-00-12v92n7vzmxxb.kirk.replit.dev/api/statistics 500 (Internal Server Error)
+(anonymous) @ queryClient.ts:32
+fetchFn @ @tanstack_react-query.js?v=46dcdf47:840
+run @ @tanstack_react-query.js?v=46dcdf47:494
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245
+setInterval
+updateRefetchInterval_fn @ @tanstack_react-query.js?v=46dcdf47:2243
+updateTimers_fn @ @tanstack_react-query.js?v=46dcdf47:2250
+onQueryUpdate @ @tanstack_react-query.js?v=46dcdf47:2206
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:998
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:997
+batch @ @tanstack_react-query.js?v=46dcdf47:583
+dispatch_fn @ @tanstack_react-query.js?v=46dcdf47:996
+onError @ @tanstack_react-query.js?v=46dcdf47:861
+reject @ @tanstack_react-query.js?v=46dcdf47:465
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:508
+Promise.catch
+run @ @tanstack_react-query.js?v=46dcdf47:498
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245
+setInterval
+updateRefetchInterval_fn @ @tanstack_react-query.js?v=46dcdf47:2243
+updateTimers_fn @ @tanstack_react-query.js?v=46dcdf47:2250
+onQueryUpdate @ @tanstack_react-query.js?v=46dcdf47:2206
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:998
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:997
+batch @ @tanstack_react-query.js?v=46dcdf47:583
+dispatch_fn @ @tanstack_react-query.js?v=46dcdf47:996
+onError @ @tanstack_react-query.js?v=46dcdf47:861
+reject @ @tanstack_react-query.js?v=46dcdf47:465
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:508
+Promise.catch
+run @ @tanstack_react-query.js?v=46dcdf47:498
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245Understand this error
+queryClient.ts:32 
+            
+            
+           GET https://3134776a-c467-4c9c-a3e8-f25a2ec4ccb6-00-12v92n7vzmxxb.kirk.replit.dev/api/projects 500 (Internal Server Error)
+(anonymous) @ queryClient.ts:32
+fetchFn @ @tanstack_react-query.js?v=46dcdf47:840
+run @ @tanstack_react-query.js?v=46dcdf47:494
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245
+setInterval
+updateRefetchInterval_fn @ @tanstack_react-query.js?v=46dcdf47:2243
+updateTimers_fn @ @tanstack_react-query.js?v=46dcdf47:2250
+onQueryUpdate @ @tanstack_react-query.js?v=46dcdf47:2206
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:998
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:997
+batch @ @tanstack_react-query.js?v=46dcdf47:583
+dispatch_fn @ @tanstack_react-query.js?v=46dcdf47:996
+onError @ @tanstack_react-query.js?v=46dcdf47:861
+reject @ @tanstack_react-query.js?v=46dcdf47:465
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:508
+Promise.catch
+run @ @tanstack_react-query.js?v=46dcdf47:498
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245
+setInterval
+updateRefetchInterval_fn @ @tanstack_react-query.js?v=46dcdf47:2243
+updateTimers_fn @ @tanstack_react-query.js?v=46dcdf47:2250
+onQueryUpdate @ @tanstack_react-query.js?v=46dcdf47:2206
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:998
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:997
+batch @ @tanstack_react-query.js?v=46dcdf47:583
+dispatch_fn @ @tanstack_react-query.js?v=46dcdf47:996
+onError @ @tanstack_react-query.js?v=46dcdf47:861
+reject @ @tanstack_react-query.js?v=46dcdf47:465
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:508
+Promise.catch
+run @ @tanstack_react-query.js?v=46dcdf47:498
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245
+setInterval
+updateRefetchInterval_fn @ @tanstack_react-query.js?v=46dcdf47:2243
+updateTimers_fn @ @tanstack_react-query.js?v=46dcdf47:2250
+onQueryUpdate @ @tanstack_react-query.js?v=46dcdf47:2206
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:998
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:997
+batch @ @tanstack_react-query.js?v=46dcdf47:583
+dispatch_fn @ @tanstack_react-query.js?v=46dcdf47:996
+onError @ @tanstack_react-query.js?v=46dcdf47:861
+reject @ @tanstack_react-query.js?v=46dcdf47:465
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:508
+Promise.catch
+run @ @tanstack_react-query.js?v=46dcdf47:498
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245Understand this error
+queryClient.ts:32 
+            
+            
+           GET https://3134776a-c467-4c9c-a3e8-f25a2ec4ccb6-00-12v92n7vzmxxb.kirk.replit.dev/api/statistics 500 (Internal Server Error)
+(anonymous) @ queryClient.ts:32
+fetchFn @ @tanstack_react-query.js?v=46dcdf47:840
+run @ @tanstack_react-query.js?v=46dcdf47:494
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245
+setInterval
+updateRefetchInterval_fn @ @tanstack_react-query.js?v=46dcdf47:2243
+updateTimers_fn @ @tanstack_react-query.js?v=46dcdf47:2250
+onQueryUpdate @ @tanstack_react-query.js?v=46dcdf47:2206
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:998
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:997
+batch @ @tanstack_react-query.js?v=46dcdf47:583
+dispatch_fn @ @tanstack_react-query.js?v=46dcdf47:996
+onError @ @tanstack_react-query.js?v=46dcdf47:861
+reject @ @tanstack_react-query.js?v=46dcdf47:465
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:508
+Promise.catch
+run @ @tanstack_react-query.js?v=46dcdf47:498
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245
+setInterval
+updateRefetchInterval_fn @ @tanstack_react-query.js?v=46dcdf47:2243
+updateTimers_fn @ @tanstack_react-query.js?v=46dcdf47:2250
+onQueryUpdate @ @tanstack_react-query.js?v=46dcdf47:2206
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:998
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:997
+batch @ @tanstack_react-query.js?v=46dcdf47:583
+dispatch_fn @ @tanstack_react-query.js?v=46dcdf47:996
+onError @ @tanstack_react-query.js?v=46dcdf47:861
+reject @ @tanstack_react-query.js?v=46dcdf47:465
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:508
+Promise.catch
+run @ @tanstack_react-query.js?v=46dcdf47:498
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245
+setInterval
+updateRefetchInterval_fn @ @tanstack_react-query.js?v=46dcdf47:2243
+updateTimers_fn @ @tanstack_react-query.js?v=46dcdf47:2250
+onQueryUpdate @ @tanstack_react-query.js?v=46dcdf47:2206
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:998
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:997
+batch @ @tanstack_react-query.js?v=46dcdf47:583
+dispatch_fn @ @tanstack_react-query.js?v=46dcdf47:996
+onError @ @tanstack_react-query.js?v=46dcdf47:861
+reject @ @tanstack_react-query.js?v=46dcdf47:465
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:508
+Promise.catch
+run @ @tanstack_react-query.js?v=46dcdf47:498
+start @ @tanstack_react-query.js?v=46dcdf47:536
+fetch @ @tanstack_react-query.js?v=46dcdf47:926
+executeFetch_fn @ @tanstack_react-query.js?v=46dcdf47:2211
+(anonymous) @ @tanstack_react-query.js?v=46dcdf47:2245Understand this error
