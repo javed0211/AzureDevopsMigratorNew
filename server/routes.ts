@@ -173,10 +173,30 @@ class AzureDevOpsClient {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Start Python FastAPI backend
+  const { spawn } = await import('child_process');
+  
+  console.log('Starting Python FastAPI backend on port 8000...');
+  const pythonProcess = spawn('python', ['-m', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', '8000'], {
+    cwd: './backend',
+    stdio: 'pipe'
+  });
+  
+  pythonProcess.stdout?.on('data', (data: Buffer) => {
+    console.log(`[python] ${data.toString().trim()}`);
+  });
+  
+  pythonProcess.stderr?.on('data', (data: Buffer) => {
+    console.log(`[python error] ${data.toString().trim()}`);
+  });
+  
+  // Wait for Python backend to start
+  await new Promise(resolve => setTimeout(resolve, 5000));
+  
   // Proxy ADO Connections to Python backend
   app.get("/api/connections", async (req, res) => {
     try {
-      const response = await fetch("http://localhost:5000/api/connections");
+      const response = await fetch("http://localhost:8000/api/connections");
       const data = await response.json();
       res.json(data);
     } catch (error) {
@@ -186,7 +206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/connections", async (req, res) => {
     try {
-      const response = await fetch("http://localhost:5000/api/connections", {
+      const response = await fetch("http://localhost:8000/api/connections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(req.body)
@@ -203,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/connections/test", async (req, res) => {
     try {
-      const response = await fetch("http://localhost:5000/api/connections/test", {
+      const response = await fetch("http://localhost:8000/api/connections/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(req.body)
@@ -221,7 +241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Proxy Projects to Python backend
   app.get("/api/projects", async (req, res) => {
     try {
-      const response = await fetch("http://localhost:5000/api/projects");
+      const response = await fetch("http://localhost:8000/api/projects");
       const data = await response.json();
       res.json(data);
     } catch (error) {
@@ -231,7 +251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/projects/sync", async (req, res) => {
     try {
-      const response = await fetch("http://localhost:5000/api/projects/sync", {
+      const response = await fetch("http://localhost:8000/api/projects/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(req.body)
@@ -494,7 +514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Proxy Statistics to Python backend
   app.get("/api/statistics", async (req, res) => {
     try {
-      const response = await fetch("http://localhost:5000/api/statistics");
+      const response = await fetch("http://localhost:8000/api/statistics");
       const data = await response.json();
       res.json(data);
     } catch (error) {
