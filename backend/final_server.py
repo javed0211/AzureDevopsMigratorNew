@@ -40,13 +40,14 @@ app = FastAPI(
     description="Enterprise Azure DevOps project migration and extraction tool"
 )
 
-# CORS middleware
+# CORS middleware - Allow all origins for development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Global storage (in production this would be a database)

@@ -174,6 +174,32 @@ class AzureDevOpsClient {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
+  // Proxy API requests to Python backend
+  app.use('/api', async (req, res, next) => {
+    try {
+      const pythonBackendUrl = `http://localhost:8000${req.url}`;
+      const response = await fetch(pythonBackendUrl, {
+        method: req.method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...req.headers
+        },
+        body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined
+      });
+      
+      if (!response.ok) {
+        return res.status(response.status).json({ error: response.statusText });
+      }
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error('Proxy error:', error);
+      // Fall through to existing Node.js implementation
+      next();
+    }
+  });
+  
   // ADO Connections API
   app.get("/api/connections", async (req, res) => {
     try {

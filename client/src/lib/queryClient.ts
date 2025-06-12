@@ -12,11 +12,7 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  // Route to Python backend on port 8000
-  const baseUrl = "http://localhost:8000";
-  const fullUrl = url.startsWith('/') ? `${baseUrl}${url}` : `${baseUrl}/${url}`;
-  
-  const res = await fetch(fullUrl, {
+  const res = await fetch(url, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
@@ -33,12 +29,7 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    // Route to Python backend on port 8000
-    const baseUrl = "http://localhost:8000";
-    const url = queryKey[0] as string;
-    const fullUrl = url.startsWith('/') ? `${baseUrl}${url}` : `${baseUrl}/${url}`;
-    
-    const res = await fetch(fullUrl, {
+    const res = await fetch(queryKey[0] as string, {
       credentials: "include",
     });
 
