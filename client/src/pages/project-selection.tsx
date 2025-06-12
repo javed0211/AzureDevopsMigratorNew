@@ -10,10 +10,11 @@ import { ExtractionPreviewModal } from "@/components/modals/extraction-preview-m
 import { Eye, Settings, Download, Settings2, CheckCircle, ChartGantt, Clock, ChevronLeft, ChevronRight, Cloud } from "lucide-react";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import type { Project } from "@shared/schema";
+import type { AdoConnection, Project } from "@shared/schema";
 
 export default function ProjectSelection() {
   const [selectedProjects, setSelectedProjects] = useState<number[]>([]);
+  const [selectedConnectionId, setSelectedConnectionId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [processFilter, setProcessFilter] = useState("all");
   const [visibilityFilter, setVisibilityFilter] = useState("all");
@@ -30,7 +31,7 @@ export default function ProjectSelection() {
     refetchInterval: 5000,
     enabled: false,
   });
-  
+
   const {
     data: projects,
     isLoading: projectsLoading,
@@ -40,11 +41,19 @@ export default function ProjectSelection() {
     refetchInterval: 5000,
     enabled: false,
   });
-  
 
-  // Sync projects mutation
+  const {
+    data: connections
+  } = useQuery<AdoConnection[]>({
+    queryKey: ["/api/connections"],
+  });
+
+
   const syncProjectsMutation = useMutation({
-    mutationFn: () => api.projects.sync(),
+    mutationFn: () => {
+      if (!selectedConnectionId) throw new Error("No connection selected");
+      return api.projects.sync(selectedConnectionId);
+    },
     onSuccess: async () => {
       await refetchProjects();
       await refetchStatistics();
@@ -61,9 +70,7 @@ export default function ProjectSelection() {
       });
     },
   });
-  
 
-  // Bulk select mutation
   const bulkSelectMutation = useMutation({
     mutationFn: ({ projectIds, status }: { projectIds: number[], status: string }) =>
       api.projects.bulkUpdateStatus(projectIds, status),
@@ -77,20 +84,17 @@ export default function ProjectSelection() {
     },
   });
 
-  // Initialize projects on component mount
   useEffect(() => {
-    if (projects && projects.length === 0) {
-      syncProjectsMutation.mutate();
+    if (connections && connections.length > 0 && !selectedConnectionId) {
+      setSelectedConnectionId(connections[0].id);
     }
-  }, [projects]);
+  }, [connections]);
 
-  // Filter projects
   const filteredProjects = (projects || []).filter((project: Project) => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (project.description?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
     const matchesProcess = processFilter === "all" || project.processTemplate.toLowerCase() === processFilter.toLowerCase();
     const matchesVisibility = visibilityFilter === "all" || project.visibility.toLowerCase() === visibilityFilter.toLowerCase();
-
     return matchesSearch && matchesProcess && matchesVisibility;
   });
 
@@ -124,19 +128,12 @@ export default function ProjectSelection() {
       });
       return;
     }
-
-    bulkSelectMutation.mutate({
-      projectIds: selectedProjects,
-      status: "selected"
-    });
+    bulkSelectMutation.mutate({ projectIds: selectedProjects, status: "selected" });
   };
 
   const handleConfirmExtraction = () => {
     if (previewProject) {
-      bulkSelectMutation.mutate({
-        projectIds: [previewProject.id],
-        status: "extracting"
-      });
+      bulkSelectMutation.mutate({ projectIds: [previewProject.id], status: "extracting" });
     }
     setShowPreviewModal(false);
     setPreviewProject(null);
@@ -261,7 +258,10 @@ export default function ProjectSelection() {
             </div>
             <div className="flex items-center space-x-4">
               <Button
-                onClick={() => syncProjectsMutation.mutate()}
+                onClick={() => {
+                  console.log("🔄 Sync button clicked");
+                  syncProjectsMutation.mutate();
+                }}
                 disabled={syncProjectsMutation.isPending}
                 className="bg-azure-blue hover:bg-azure-blue/90 text-white"
               >

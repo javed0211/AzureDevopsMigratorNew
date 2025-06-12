@@ -7,8 +7,10 @@ export const api = {
     getAll: (): Promise<Project[]> => 
       apiRequest("GET", "/api/projects").then(res => res.json()),
     
-    sync: (): Promise<Project[]> =>
-      apiRequest("POST", "/api/projects/sync").then(res => res.json()),
+    sync: (connectionId: number): Promise<Project[]> => {
+      console.log("[SYNC] Triggered sync for connection ID:", connectionId);
+      return apiRequest("POST", `/api/projects/sync/${connectionId}`).then(res => res.json());
+    },    
     
     updateStatus: (id: number, status: string): Promise<Project> =>
       apiRequest("PATCH", `/api/projects/${id}/status?status=${status}`).then(res => res.json()),

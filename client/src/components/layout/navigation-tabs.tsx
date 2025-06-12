@@ -5,6 +5,7 @@ const tabs = [
   { path: "/extraction", label: "Extraction Overview" },
   { path: "/migration", label: "Migration" },
   { path: "/audit", label: "Audit & Logs" },
+  { path: "/settings", label: "Settings" },
 ];
 
 export function NavigationTabs() {

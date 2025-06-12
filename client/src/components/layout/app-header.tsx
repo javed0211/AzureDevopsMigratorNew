@@ -2,14 +2,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Settings } from "lucide-react";
 import { Cloud } from "lucide-react";
+import { Link } from "wouter"; // 👈 Make sure this is imported
 
 interface AppHeaderProps {
   onRefresh: () => void;
-  onOpenSettings: () => void;
   connectionStatus: boolean;
 }
 
-export function AppHeader({ onRefresh, onOpenSettings, connectionStatus }: AppHeaderProps) {
+export function AppHeader({ onRefresh, connectionStatus }: AppHeaderProps) {
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -24,6 +24,7 @@ export function AppHeader({ onRefresh, onOpenSettings, connectionStatus }: AppHe
               {connectionStatus ? "Connected" : "Disconnected"}
             </Badge>
           </div>
+
           <div className="flex items-center space-x-4">
             <Button
               variant="ghost"
@@ -31,15 +32,7 @@ export function AppHeader({ onRefresh, onOpenSettings, connectionStatus }: AppHe
               onClick={onRefresh}
               className="text-gray-400 hover:text-gray-600"
             >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              onClick={onOpenSettings}
-              className="text-gray-700 hover:bg-gray-50"
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
+              <RefreshCw className="h-4 w-4" /> Refresh Data
             </Button>
           </div>
         </div>
