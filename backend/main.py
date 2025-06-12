@@ -74,8 +74,10 @@ class AzureDevOpsClient:
         self.organization = organization
         self.pat_token = pat_token
         self.base_url = f"https://dev.azure.com/{organization}"
+        import base64
+        encoded_token = base64.b64encode(f":{self.pat_token}".encode()).decode()
         self.headers = {
-            "Authorization": f"Basic {self.pat_token}",
+            "Authorization": f"Basic {encoded_token}",
             "Content-Type": "application/json"
         }
 
