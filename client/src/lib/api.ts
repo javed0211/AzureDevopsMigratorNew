@@ -7,10 +7,16 @@ export const api = {
     getAll: (): Promise<Project[]> => 
       apiRequest("GET", "/api/projects").then(res => res.json()),
     
-    sync: (connectionId: number): Promise<Project[]> => {
-      console.log("[SYNC] Triggered sync for connection ID:", connectionId);
-      return apiRequest("POST", `/api/projects/sync/${connectionId}`).then(res => res.json());
-    },    
+    getSelected: (): Promise<Project[]> =>
+      apiRequest("GET", "/api/projects/selected").then(res => res.json()),
+    
+    sync: (connectionId: number) =>
+      fetch(`/api/projects/sync/${connectionId}`, {
+        method: "POST",
+      }).then((res) => {
+        if (!res.ok) throw new Error("Sync failed");
+        return res.json();
+      }),     
     
     updateStatus: (id: number, status: string): Promise<Project> =>
       apiRequest("PATCH", `/api/projects/${id}/status?status=${status}`).then(res => res.json()),
@@ -20,6 +26,14 @@ export const api = {
     
     extract: (projectIds: number[], artifactTypes: string[]): Promise<{ message: string; projectIds: number[] }> =>
       apiRequest("POST", "/api/projects/extract", { projectIds, artifactTypes }).then(res => res.json()),
+  },
+  
+  extraction: {
+    getJobs: () => 
+      apiRequest("GET", "/api/extraction/jobs").then(res => res.json()),
+      
+    startJob: (projectId: number, artifactType: string) =>
+      apiRequest("POST", "/api/extraction/start", { projectId, artifactType }).then(res => res.json()),
   },
 
   // Statistics - Updated for Python FastAPI backend

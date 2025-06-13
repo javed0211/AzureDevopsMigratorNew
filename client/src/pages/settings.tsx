@@ -10,21 +10,28 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { TestTube, Save } from "lucide-react";
+import { TestTube, Save, Plus, Pencil } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 type AdoConnection = {
   id: number;
   name: string;
   organization: string;
+  patToken?: string;
   type: "source" | "target";
   isActive: boolean;
 };
+
 
 export default function Settings() {
   const { toast } = useToast();
   const [connectionTesting, setConnectionTesting] = useState(false);
   const [sourceConnectionStatus, setSourceConnectionStatus] = useState<'unknown' | 'connected' | 'error'>('unknown');
   const [targetConnectionStatus, setTargetConnectionStatus] = useState<'unknown' | 'connected' | 'error'>('unknown');
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [newConnection, setNewConnection] = useState({ name: '', organization: '', patToken: '' });
+  const [showAddDialog, setShowAddDialog] = useState(false);
+
 
   const [adoSettings, setAdoSettings] = useState({
     sourceOrg: "",
@@ -48,6 +55,29 @@ export default function Settings() {
   const { data: connections = [] } = useQuery<AdoConnection[]>({
     queryKey: ['/api/connections'],
   });
+
+  const [adoConnections, setAdoConnections] = useState<AdoConnection[]>([]);
+
+  // Populate from DB on mount
+  useEffect(() => {
+    if (connections.length > 0) {
+      setAdoConnections(connections);
+    }
+  }, [connections]);
+
+  const handleUpdateConnection = (index: number, field: keyof AdoConnection, value: string | boolean) => {
+    const updated = [...adoConnections];
+    updated[index][field] = value as never;
+    setAdoConnections(updated);
+  };
+
+  const handleAddConnection = () => {
+    setAdoConnections(prev => [
+      ...prev,
+      { id: Date.now(), name: '', organization: '', type: 'source', isActive: true },
+    ]);
+  };
+
 
   useEffect(() => {
     if (connections.length > 0) {
@@ -113,25 +143,27 @@ export default function Settings() {
       if (!response.ok) throw new Error('Connection test failed');
       return response.json();
     },
-    onSuccess: (data, variables) => {
-      const type = variables.organization === adoSettings.sourceOrg ? 'source' : 'target';
-      if (type === 'source') {
-        setSourceConnectionStatus('connected');
-      } else {
-        setTargetConnectionStatus('connected');
-      }
+    onSuccess: (_data, variables) => {
+      setAdoConnections(prev => prev.map(conn => {
+        if (conn.organization === variables.organization) {
+          return { ...conn, isActive: true }; 
+        }
+        return conn;
+      }));
+
       toast({
         title: "Connection Test Successful",
-        description: `${type === 'source' ? 'Source' : 'Target'} connection is working properly.`,
+        description: `Connection is working properly.`,
       });
     },
     onError: (error: any, variables) => {
-      const type = variables.organization === adoSettings.sourceOrg ? 'source' : 'target';
-      if (type === 'source') {
-        setSourceConnectionStatus('error');
-      } else {
-        setTargetConnectionStatus('error');
-      }
+      setAdoConnections(prev => prev.map(conn => {
+        if (conn.organization === variables.organization) {
+          return { ...conn, isActive: false };
+        }
+        return conn;
+      }));
+    
       toast({
         title: "Connection Test Failed",
         description: error.message || "Unable to connect to Azure DevOps.",
@@ -155,6 +187,19 @@ export default function Settings() {
 
     testConnectionMutation.mutate({ organization, patToken });
   };
+
+  const handleSaveAllConnections = async () => {
+    for (const conn of adoConnections) {
+      await saveConnectionMutation.mutateAsync({
+        name: conn.name,
+        organization: conn.organization,
+        patToken: conn.patToken,
+        type: conn.type,
+        isActive: conn.isActive,
+      });
+    }
+  };
+
 
   const handleSave = async () => {
     const hasSource = adoSettings.sourceOrg && adoSettings.sourcePat;
@@ -194,14 +239,7 @@ export default function Settings() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Settings</h2>
-        <Button
-          onClick={handleSave}
-          disabled={saveConnectionMutation.isPending}
-          className="bg-azure-blue hover:bg-azure-dark"
-        >
-          <Save className="h-4 w-4 mr-2" />
-          {saveConnectionMutation.isPending ? "Saving..." : "Save Settings"}
-        </Button>
+        <Button onClick={handleSaveAllConnections}><Save className="h-4 w-4 mr-2" /> Save All</Button>
       </div>
 
       <Tabs defaultValue="connections" className="w-full">
@@ -213,118 +251,159 @@ export default function Settings() {
         </TabsList>
 
         <TabsContent value="connections" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Source Organization
-                  <Badge className={
-                    sourceConnectionStatus === 'connected' ? 'bg-green-100 text-green-800' :
-                      sourceConnectionStatus === 'error' ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100 text-gray-800'
-                  }>
-                    {sourceConnectionStatus === 'connected' ? 'Connected' :
-                      sourceConnectionStatus === 'error' ? 'Error' : 'Not Configured'}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="source-display-name">Display Name</Label>
+          <div className="flex justify-start">
+            <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+              <DialogTrigger asChild>
+                <Button><Plus className="h-4 w-4 mr-2" /> Add ADO Connection</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add ADO Connection</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
                   <Input
-                    id="source-display-name"
-                    value={adoSettings.sourceDisplayName}
-                    onChange={(e) => setAdoSettings({ ...adoSettings, sourceDisplayName: e.target.value })}
-                    placeholder="Source Organization"
+                    placeholder="Display Name"
+                    value={newConnection.name}
+                    onChange={(e) => setNewConnection({ ...newConnection, name: e.target.value })}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="source-org">Organization URL</Label>
                   <Input
-                    id="source-org"
-                    value={adoSettings.sourceOrg}
-                    onChange={(e) => setAdoSettings({ ...adoSettings, sourceOrg: e.target.value })}
-                    placeholder="https://dev.azure.com/your-org"
+                    placeholder="Organization URL"
+                    value={newConnection.organization}
+                    onChange={(e) => setNewConnection({ ...newConnection, organization: e.target.value })}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="source-pat">Personal Access Token</Label>
                   <Input
-                    id="source-pat"
+                    placeholder="Personal Access Token"
                     type="password"
-                    value={adoSettings.sourcePat}
-                    onChange={(e) => setAdoSettings({ ...adoSettings, sourcePat: e.target.value })}
-                    placeholder="Enter PAT token"
+                    value={newConnection.patToken}
+                    onChange={(e) => setNewConnection({ ...newConnection, patToken: e.target.value })}
                   />
+                  <Button
+                    disabled={!newConnection.organization || !newConnection.patToken}
+                    onClick={() => testConnectionMutation.mutate({
+                      organization: newConnection.organization,
+                      patToken: newConnection.patToken || ''
+                    })}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    <TestTube className="h-4 w-4 mr-2" /> Test Connection
+                  </Button>
+                  <Button
+                    disabled={
+                      !newConnection.name || !newConnection.organization || !newConnection.patToken
+                    }
+                    onClick={() => saveConnectionMutation.mutate({
+                      name: newConnection.name,
+                      organization: newConnection.organization,
+                      patToken: newConnection.patToken || '',
+                      type: 'source',
+                      isActive: true,
+                    })}
+                    className="w-full"
+                  >
+                    Save Connection
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() => handleTestConnection('source')}
-                  disabled={testConnectionMutation.isPending}
-                  className="w-full"
-                >
-                  <TestTube className="h-4 w-4 mr-2" />
-                  {testConnectionMutation.isPending ? "Testing..." : "Test Connection"}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Target Organization
-                  <Badge className={
-                    targetConnectionStatus === 'connected' ? 'bg-green-100 text-green-800' :
-                      targetConnectionStatus === 'error' ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100 text-gray-800'
-                  }>
-                    {targetConnectionStatus === 'connected' ? 'Connected' :
-                      targetConnectionStatus === 'error' ? 'Error' : 'Not Configured'}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="target-display-name">Display Name</Label>
-                  <Input
-                    id="target-display-name"
-                    value={adoSettings.targetDisplayName}
-                    onChange={(e) => setAdoSettings({ ...adoSettings, targetDisplayName: e.target.value })}
-                    placeholder="Target Organization"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="target-org">Organization URL</Label>
-                  <Input
-                    id="target-org"
-                    value={adoSettings.targetOrg}
-                    onChange={(e) => setAdoSettings({ ...adoSettings, targetOrg: e.target.value })}
-                    placeholder="https://dev.azure.com/target-org"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="target-pat">Personal Access Token</Label>
-                  <Input
-                    id="target-pat"
-                    type="password"
-                    value={adoSettings.targetPat}
-                    onChange={(e) => setAdoSettings({ ...adoSettings, targetPat: e.target.value })}
-                    placeholder="Enter PAT token"
-                  />
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={() => handleTestConnection('target')}
-                  disabled={testConnectionMutation.isPending}
-                  className="w-full"
-                >
-                  <TestTube className="h-4 w-4 mr-2" />
-                  {testConnectionMutation.isPending ? "Testing..." : "Test Connection"}
-                </Button>
-              </CardContent>
-            </Card>
+              </DialogContent>
+            </Dialog>
           </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-2">Name</th>
+                  <th className="text-left p-2">Organization</th>
+                  <th className="text-left p-2">Status</th>
+                  <th className="text-left p-2">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {adoConnections.map((conn, index) => (
+                  <tr key={conn.id} className="border-b">
+                    <td className="p-2">{conn.name}</td>
+                    <td className="p-2">{conn.organization}</td>
+                    <td className="p-2">
+                      <Badge className={conn.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
+                        {conn.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </td>
+                    <td className="p-2">
+                      <Button variant="outline" size="sm" onClick={() => setEditIndex(index)}>
+                        <Pencil className="h-4 w-4 mr-1" /> Edit
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {editIndex !== null && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card key={adoConnections[editIndex].id}>
+                <CardHeader>
+                  <CardTitle>Edit ADO Connection</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Input
+                    placeholder="Display Name"
+                    value={adoConnections[editIndex].name}
+                    onChange={(e) => handleUpdateConnection(editIndex, "name", e.target.value)}
+                  />
+                  <Input
+                    placeholder="Organization URL"
+                    value={adoConnections[editIndex].organization}
+                    onChange={(e) => handleUpdateConnection(editIndex, "organization", e.target.value)}
+                  />
+                  <Input
+                    placeholder="Personal Access Token"
+                    type="password"
+                    value={adoConnections[editIndex].patToken || ''}
+                    onChange={(e) => handleUpdateConnection(editIndex, "patToken", e.target.value)}
+                  />
+
+                  <div className="flex gap-4">
+                    <Button
+                      onClick={() => testConnectionMutation.mutate({
+                        organization: adoConnections[editIndex].organization,
+                        patToken: adoConnections[editIndex].patToken || ''
+                      })}
+                      variant="outline"
+                    >
+                      <TestTube className="h-4 w-4 mr-2" /> Test Connection
+                    </Button>
+
+                    <Button
+                      onClick={() => {
+                        saveConnectionMutation.mutate({
+                          name: adoConnections[editIndex].name,
+                          organization: adoConnections[editIndex].organization,
+                          patToken: adoConnections[editIndex].patToken || '',
+                          type: adoConnections[editIndex].type || 'source',
+                          isActive: true,
+                        });
+                        setEditIndex(null); // ✅ Close form after save
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      Save Changes
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      onClick={() => setEditIndex(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+            </div>
+          )}
         </TabsContent>
+
 
         <TabsContent value="storage" className="space-y-6">
           <Card>

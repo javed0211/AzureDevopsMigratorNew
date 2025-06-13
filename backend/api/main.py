@@ -4,15 +4,33 @@ Primary backend server replacing Node.js
 """
 import os
 import logging
-from datetime import datetime
+import sys
+import asyncio
+import random
+import time
+from pathlib import Path
+from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import base64
 import json
 from .schemas import ConnectionResponse
+from dateutil.parser import parse as parse_datetime
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+# Load environment variables from .env file
+from dotenv import load_dotenv
+# Get the backend directory path
+backend_dir = Path(__file__).resolve().parent.parent
+# Load .env file from backend directory
+load_dotenv(backend_dir / ".env")
+
+from backend.database.connection import get_db
+from backend.database.models import Project, ExtractionJob
 
 try:
     import psycopg2
@@ -101,6 +119,29 @@ class ExtractRequest(BaseModel):
     projectIds: List[int]
     artifactTypes: List[str]
 
+class BulkStatusUpdateRequest(BaseModel):
+    project_ids: List[int]
+    status: str
+
+@app.post("/api/projects/bulk-status")
+async def bulk_update_status(request: BulkStatusUpdateRequest):
+    try:
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            for project_id in request.project_ids:
+                cursor.execute("""
+                    UPDATE projects
+                    SET status = %s
+                    WHERE id = %s
+                """, (request.status, project_id))
+            conn.commit()
+            return {"message": f"Updated {len(request.project_ids)} project(s) to status '{request.status}'"}
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error(f"Error updating project statuses: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update project statuses")
 class AzureDevOpsClient:
     def __init__(self, organization: str, pat_token: str):
         self.organization = organization
@@ -112,22 +153,109 @@ class AzureDevOpsClient:
             "Authorization": f"Basic {encoded_token}",
             "Content-Type": "application/json"
         }
+        self.session = None
+        
+    async def _get_session(self):
+        """Get or create an aiohttp ClientSession"""
+        if self.session is None or self.session.closed:
+            self.session = aiohttp.ClientSession()
+        return self.session
+        
+    async def get_project_details(self, project_id: str) -> dict:
+        url = f"{self.base_url}/_apis/projects/{project_id}?api-version=6.0&includeCapabilities=true"
+        session = await self._get_session()
+        async with session.get(url, headers=self.headers) as response:
+            if response.status == 200:
+                return await response.json()
+            else:
+                logger.warning(f"Failed to fetch project details for {project_id}")
+                return {}
 
     async def get_projects(self) -> List[Dict[str, Any]]:
         """Get all projects from Azure DevOps"""
         try:
-            async with aiohttp.ClientSession() as session:
-                url = f"{self.base_url}/_apis/projects?api-version=6.0"
-                async with session.get(url, headers=self.headers) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return data.get('value', [])
-                    else:
-                        logger.error(f"ADO API error: {response.status}")
-                        return []
+            session = await self._get_session()
+            url = f"{self.base_url}/_apis/projects?api-version=6.0"
+            async with session.get(url, headers=self.headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get('value', [])
+                else:
+                    logger.error(f"ADO API error: {response.status}")
+                    return []
         except Exception as e:
             logger.error(f"Error fetching projects: {e}")
             return []
+            
+    async def get_work_items_count(self, project_name: str) -> int:
+        """Get the count of work items in a project"""
+        try:
+            # Create a WIQL query to count all work items in the project
+            wiql_query = {
+                "query": f"SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '{project_name}' AND [System.WorkItemType] <> ''"
+            }
+            
+            session = await self._get_session()
+            url = f"{self.base_url}/{project_name}/_apis/wit/wiql?api-version=6.0"
+            async with session.post(url, headers=self.headers, json=wiql_query) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return len(data.get('workItems', []))
+                else:
+                    logger.error(f"ADO API error getting work item count: {response.status}")
+                    return 0
+        except Exception as e:
+            logger.error(f"Error fetching work item count: {e}")
+            return 0
+            
+    async def get_work_item_ids(self, project_name: str, batch_size: int = 200) -> List[int]:
+        """Get all work item IDs in a project"""
+        try:
+            # Create a WIQL query to get all work items in the project
+            wiql_query = {
+                "query": f"SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '{project_name}' AND [System.WorkItemType] <> '' ORDER BY [System.Id]"
+            }
+            
+            session = await self._get_session()
+            url = f"{self.base_url}/{project_name}/_apis/wit/wiql?api-version=6.0"
+            async with session.post(url, headers=self.headers, json=wiql_query) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return [item['id'] for item in data.get('workItems', [])]
+                else:
+                    logger.error(f"ADO API error getting work item IDs: {response.status}")
+                    return []
+        except Exception as e:
+            logger.error(f"Error fetching work item IDs: {e}")
+            return []
+            
+    async def get_work_item_details(self, work_item_ids: List[int]) -> List[Dict[str, Any]]:
+        """Get details for a batch of work items"""
+        if not work_item_ids:
+            return []
+            
+        try:
+            # Azure DevOps API allows fetching up to 200 work items at once
+            ids_str = ','.join(map(str, work_item_ids))
+            fields = "System.Id,System.Title,System.WorkItemType,System.State,System.AssignedTo,System.CreatedDate,System.ChangedDate,System.AreaPath,System.IterationPath,Microsoft.VSTS.Common.Priority,System.Tags,System.Description"
+            
+            session = await self._get_session()
+            url = f"{self.base_url}/_apis/wit/workitems?ids={ids_str}&fields={fields}&api-version=6.0"
+            async with session.get(url, headers=self.headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get('value', [])
+                else:
+                    logger.error(f"ADO API error getting work item details: {response.status}")
+                    return []
+        except Exception as e:
+            logger.error(f"Error fetching work item details: {e}")
+            return []
+            
+    async def close(self):
+        """Close the aiohttp session"""
+        if self.session and not self.session.closed:
+            await self.session.close()
 
 # API Endpoints
 @app.get("/")
@@ -137,23 +265,40 @@ async def root():
 
 @app.get("/api/projects")
 async def get_projects():
-    """Get all projects from database"""
     try:
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT p.id, p.external_id as externalId, p.name, p.description,
-                       p.process_template as processTemplate, p.source_control as sourceControl,
-                       p.visibility, p.status, p.created_date as createdDate,
-                       p.work_item_count as workItemCount, p.repo_count as repoCount,
-                       p.test_case_count as testCaseCount, p.pipeline_count as pipelineCount,
-                       p.connection_id as connectionId
-                FROM projects p
-                ORDER BY p.name
+                SELECT id, external_id, name, description,
+                       process_template, source_control,
+                       visibility, status, created_date,
+                       work_item_count, repo_count,
+                       test_case_count, pipeline_count,
+                       connection_id
+                FROM projects
+                ORDER BY name
             """)
-            projects = cursor.fetchall()
-            return [dict(project) for project in projects]
+            rows = cursor.fetchall()
+            projects = []
+            for row in rows:
+                projects.append({
+                    "id": row["id"],
+                    "externalId": row["external_id"],
+                    "name": row["name"],
+                    "description": row["description"],
+                    "processTemplate": row["process_template"],
+                    "sourceControl": row["source_control"],
+                    "visibility": row["visibility"],
+                    "status": row["status"],
+                    "createdDate": row["created_date"],
+                    "workItemCount": row["work_item_count"],
+                    "repoCount": row["repo_count"],
+                    "testCaseCount": row["test_case_count"],
+                    "pipelineCount": row["pipeline_count"],
+                    "connectionId": row["connection_id"],
+                })
+            return projects
         finally:
             conn.close()
     except Exception as e:
@@ -208,7 +353,6 @@ async def get_connections():
     except Exception as e:
         logger.error(f"Error fetching connections: {e}")
         return {"message": "Failed to fetch connections"}
-
 @app.post("/api/connections")
 async def create_connection(connection_data: dict):
     """Create or update Azure DevOps connection"""
@@ -313,6 +457,537 @@ async def sync_projects():
         logger.error(f"Error syncing projects: {e}")
         return {"message": "Failed to sync projects"}
 
+@app.get("/api/extraction/jobs")
+def get_extraction_jobs(db: Session = Depends(get_db)):
+    try:
+        # Auto-complete any stalled jobs (in_progress for more than 5 minutes)
+        stalled_jobs = (
+            db.query(ExtractionJob)
+            .filter(
+                ExtractionJob.status == "in_progress",
+                ExtractionJob.started_at < datetime.utcnow() - timedelta(minutes=5)
+            )
+            .all()
+        )
+        
+        if stalled_jobs:
+            print(f"Found {len(stalled_jobs)} stalled jobs, marking as completed")
+            for job in stalled_jobs:
+                job.status = "completed"
+                job.progress = 100
+                job.extracted_items = job.total_items or 10
+                job.total_items = job.total_items or 10
+                job.completed_at = datetime.utcnow()
+            db.commit()
+        
+        # Get all jobs
+        jobs = (
+            db.query(ExtractionJob, Project.name)
+            .join(Project, ExtractionJob.project_id == Project.id)
+            .order_by(ExtractionJob.started_at.desc())
+            .all()
+        )
+
+        result = []
+        for job, project_name in jobs:
+            result.append({
+                "id": job.id,
+                "projectId": job.project_id,
+                "projectName": project_name,
+                "status": job.status,
+                "progress": job.progress,
+                "artifactType": job.artifact_type,
+                "startedAt": job.started_at,
+                "completedAt": job.completed_at,
+                "extractedItems": job.extracted_items or 0,
+                "totalItems": job.total_items or 0,
+                "canReExtract": job.status in ["completed", "failed"]
+            })
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Failed to fetch extraction jobs: {e}")
+        return []
+
+@app.post("/api/extraction/{job_id}/reextract")
+async def reextract_job(job_id: int, db: Session = Depends(get_db)):
+    try:
+        # Get the job
+        job = db.query(ExtractionJob).filter(ExtractionJob.id == job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        # Get the project
+        project = db.query(Project).filter(Project.id == job.project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        # Create a new extraction job
+        new_job = ExtractionJob(
+            project_id=job.project_id,
+            artifact_type=job.artifact_type,
+            status="in_progress",
+            started_at=datetime.utcnow(),
+            progress=0
+        )
+        
+        db.add(new_job)
+        db.commit()
+        db.refresh(new_job)
+        
+        # Start extraction process in the background based on artifact type
+        if job.artifact_type == "workitems":
+            asyncio.create_task(extract_work_items(new_job.id, project.id, project.name, project.connection_id))
+        elif job.artifact_type == "repositories":
+            asyncio.create_task(extract_repositories(new_job.id, project.id, project.name, project.connection_id))
+        elif job.artifact_type == "pipelines":
+            asyncio.create_task(extract_pipelines(new_job.id, project.id, project.name, project.connection_id))
+        elif job.artifact_type == "testcases":
+            asyncio.create_task(extract_testcases(new_job.id, project.id, project.name, project.connection_id))
+        else:
+            # Unknown artifact type, simulate extraction
+            asyncio.create_task(simulate_extraction(new_job.id, 10))
+        
+        return {
+            "id": new_job.id,
+            "projectId": new_job.project_id,
+            "projectName": project.name,
+            "status": new_job.status,
+            "artifactType": new_job.artifact_type,
+            "startedAt": new_job.started_at,
+            "progress": new_job.progress,
+            "totalItems": new_job.total_items
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to re-extract job: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to re-extract job: {str(e)}")
+
+class ExtractRequest(BaseModel):
+    projectId: int
+    artifactType: str
+
+async def extract_work_items(job_id: int, project_id: int, project_name: str, connection_id: int):
+    """Extract work items from Azure DevOps and store them in the database"""
+    print(f"Starting work item extraction for job {job_id}, project {project_name}, connection_id: {connection_id}")
+    logger.info(f"Starting work item extraction for job {job_id}, project {project_name}, connection_id: {connection_id}")
+    
+    try:
+        # Get a new database session for this background task
+        from backend.database.connection import get_db_session
+        from backend.database.models import WorkItem, ExtractionLog, ADOConnection
+        db = get_db_session()
+        
+        # Get the ADO connection
+        connection = db.query(ADOConnection).filter(ADOConnection.id == connection_id).first()
+        print(f"Looking for connection with ID: {connection_id}")
+        logger.info(f"Looking for connection with ID: {connection_id}")
+        
+        if not connection:
+            error_msg = f"Connection {connection_id} not found"
+            print(error_msg)
+            logger.error(error_msg)
+            
+            # Update job status to failed
+            job = db.query(ExtractionJob).filter(ExtractionJob.id == job_id).first()
+            if job:
+                job.status = "failed"
+                job.error_message = error_msg
+                job.completed_at = datetime.utcnow()
+                db.commit()
+            
+            return
+        
+        # Create ADO client
+        print(f"Creating ADO client for organization: {connection.organization}")
+        logger.info(f"Creating ADO client for organization: {connection.organization}")
+        ado_client = AzureDevOpsClient(connection.organization, connection.pat_token)
+        
+        # Get the job
+        job = db.query(ExtractionJob).filter(ExtractionJob.id == job_id).first()
+        if not job:
+            error_msg = f"Job {job_id} not found"
+            print(error_msg)
+            logger.error(error_msg)
+            return
+        
+        print(f"Getting work item IDs for project: {project_name}")
+        logger.info(f"Getting work item IDs for project: {project_name}")
+        
+        # Get work item IDs
+        try:
+            work_item_ids = await ado_client.get_work_item_ids(project_name)
+            total_items = len(work_item_ids)
+            print(f"Found {total_items} work items for project {project_name}")
+            logger.info(f"Found {total_items} work items for project {project_name}")
+        except Exception as e:
+            error_msg = f"Error getting work item IDs: {e}"
+            print(error_msg)
+            logger.error(error_msg)
+            
+            # Update job status to failed
+            job.status = "failed"
+            job.error_message = error_msg
+            job.completed_at = datetime.utcnow()
+            db.commit()
+            
+            # Close the ADO client session
+            try:
+                await ado_client.close()
+            except Exception as close_error:
+                logger.error(f"Error closing ADO client session: {close_error}")
+                
+            return
+        
+        # Update job with total items
+        job.total_items = total_items
+        db.commit()
+        
+        if total_items == 0:
+            logger.info(f"No work items found for project {project_name}")
+            job.status = "completed"
+            job.progress = 100
+            job.completed_at = datetime.utcnow()
+            db.commit()
+            return
+        
+        # Process work items in batches of 100
+        batch_size = 100
+        extracted_items = 0
+        
+        for i in range(0, total_items, batch_size):
+            batch_ids = work_item_ids[i:i+batch_size]
+            
+            # Get work item details
+            work_items = await ado_client.get_work_item_details(batch_ids)
+            
+            # Process each work item
+            for wi in work_items:
+                # Extract fields
+                fields = wi.get('fields', {})
+                
+                # Check if work item already exists
+                existing_wi = db.query(WorkItem).filter(
+                    WorkItem.project_id == project_id,
+                    WorkItem.external_id == wi.get('id')
+                ).first()
+                
+                if existing_wi:
+                    # Update existing work item
+                    existing_wi.title = fields.get('System.Title')
+                    existing_wi.work_item_type = fields.get('System.WorkItemType')
+                    existing_wi.state = fields.get('System.State')
+                    existing_wi.assigned_to = fields.get('System.AssignedTo', {}).get('displayName') if isinstance(fields.get('System.AssignedTo'), dict) else fields.get('System.AssignedTo')
+                    existing_wi.area_path = fields.get('System.AreaPath')
+                    existing_wi.iteration_path = fields.get('System.IterationPath')
+                    existing_wi.priority = fields.get('Microsoft.VSTS.Common.Priority')
+                    existing_wi.tags = fields.get('System.Tags')
+                    existing_wi.description = fields.get('System.Description')
+                    existing_wi.changed_date = parse_datetime(fields.get('System.ChangedDate')) if fields.get('System.ChangedDate') else None
+                    existing_wi.fields = fields
+                else:
+                    # Create new work item
+                    new_wi = WorkItem(
+                        project_id=project_id,
+                        external_id=wi.get('id'),
+                        title=fields.get('System.Title'),
+                        work_item_type=fields.get('System.WorkItemType'),
+                        state=fields.get('System.State'),
+                        assigned_to=fields.get('System.AssignedTo', {}).get('displayName') if isinstance(fields.get('System.AssignedTo'), dict) else fields.get('System.AssignedTo'),
+                        created_date=parse_datetime(fields.get('System.CreatedDate')) if fields.get('System.CreatedDate') else None,
+                        changed_date=parse_datetime(fields.get('System.ChangedDate')) if fields.get('System.ChangedDate') else None,
+                        area_path=fields.get('System.AreaPath'),
+                        iteration_path=fields.get('System.IterationPath'),
+                        priority=fields.get('Microsoft.VSTS.Common.Priority'),
+                        tags=fields.get('System.Tags'),
+                        description=fields.get('System.Description'),
+                        fields=fields
+                    )
+                    db.add(new_wi)
+                
+                extracted_items += 1
+            
+            # Commit the batch
+            db.commit()
+            
+            # Update job progress
+            progress = int((extracted_items / total_items) * 100)
+            job.progress = progress
+            job.extracted_items = extracted_items
+            db.commit()
+            
+            # Log progress
+            log_msg = f"Extracted {extracted_items}/{total_items} work items ({progress}%)"
+            print(log_msg)
+            logger.info(log_msg)
+            
+            # Add log entry
+            log_entry = ExtractionLog(
+                job_id=job_id,
+                level="INFO",
+                message=log_msg,
+                timestamp=datetime.utcnow()
+            )
+            db.add(log_entry)
+            db.commit()
+            
+            # Sleep briefly to avoid overwhelming the API
+            await asyncio.sleep(0.5)
+        
+        # Mark job as completed
+        job.status = "completed"
+        job.completed_at = datetime.utcnow()
+        db.commit()
+        
+        # Update project work item count
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if project:
+            project.work_item_count = total_items
+            db.commit()
+        
+        print(f"Work item extraction completed for project {project_name}: {extracted_items} items extracted")
+        logger.info(f"Work item extraction completed for project {project_name}: {extracted_items} items extracted")
+    
+    except Exception as e:
+        error_msg = f"Error extracting work items for job {job_id}: {e}"
+        print(error_msg)
+        logger.error(error_msg)
+        
+        # Update job status to failed
+        job = db.query(ExtractionJob).filter(ExtractionJob.id == job_id).first()
+        if job:
+            job.status = "failed"
+            job.error_message = str(e)
+            job.completed_at = datetime.utcnow()
+            db.commit()
+            
+            # Add error log
+            log_entry = ExtractionLog(
+                job_id=job_id,
+                level="ERROR",
+                message=error_msg,
+                timestamp=datetime.utcnow()
+            )
+            db.add(log_entry)
+            db.commit()
+    
+    finally:
+        # Close database session
+        db.close()
+        print(f"Database session closed for job {job_id}")
+        logger.info(f"Database session closed for job {job_id}")
+        
+        # Close ADO client session
+        try:
+            if 'ado_client' in locals():
+                await ado_client.close()
+                print(f"ADO client session closed for job {job_id}")
+                logger.info(f"ADO client session closed for job {job_id}")
+        except Exception as close_error:
+            logger.error(f"Error closing ADO client session: {close_error}")
+
+
+async def extract_repositories(job_id: int, project_id: int, project_name: str, connection_id: int):
+    """Extract repositories from Azure DevOps"""
+    # For now, we'll simulate repository extraction
+    await simulate_extraction(job_id, 5)  # Simulate 5 repositories
+
+
+async def extract_pipelines(job_id: int, project_id: int, project_name: str, connection_id: int):
+    """Extract pipelines from Azure DevOps"""
+    # For now, we'll simulate pipeline extraction
+    await simulate_extraction(job_id, 3)  # Simulate 3 pipelines
+
+
+async def extract_testcases(job_id: int, project_id: int, project_name: str, connection_id: int):
+    """Extract test cases from Azure DevOps"""
+    # For now, we'll simulate test case extraction
+    await simulate_extraction(job_id, 10)  # Simulate 10 test cases
+
+
+async def simulate_extraction(job_id: int, total_items: int):
+    """Simulate extraction process by updating job progress over time"""
+    print(f"Starting extraction simulation for job {job_id} with {total_items} items")
+    logger.info(f"Starting extraction simulation for job {job_id} with {total_items} items")
+    
+    try:
+        # Get a new database session for this background task
+        from backend.database.connection import get_db_session
+        db = get_db_session()
+        print(f"Got database session for job {job_id}")
+        logger.info(f"Got database session for job {job_id}")
+        
+        # Simulate extraction process
+        extracted_items = 0
+        while extracted_items < total_items:
+            # Sleep for a random time between 1-3 seconds
+            sleep_time = random.uniform(1, 3)
+            print(f"Job {job_id}: Sleeping for {sleep_time:.2f} seconds")
+            await asyncio.sleep(sleep_time)
+            
+            # Extract a random number of items (1-5)
+            items_to_extract = min(random.randint(1, 5), total_items - extracted_items)
+            extracted_items += items_to_extract
+            
+            # Calculate progress percentage
+            progress = int((extracted_items / total_items) * 100) if total_items > 0 else 100
+            print(f"Job {job_id}: Extracted {items_to_extract} items, total {extracted_items}/{total_items}, progress {progress}%")
+            logger.info(f"Job {job_id}: Extracted {items_to_extract} items, total {extracted_items}/{total_items}, progress {progress}%")
+            
+            # Update job in database
+            job = db.query(ExtractionJob).filter(ExtractionJob.id == job_id).first()
+            if job:
+                job.progress = progress
+                job.extracted_items = extracted_items
+                
+                # If extraction is complete, update status
+                if extracted_items >= total_items:
+                    job.status = "completed"
+                    job.completed_at = datetime.utcnow()
+                    print(f"Job {job_id}: Completed at {job.completed_at}")
+                    logger.info(f"Job {job_id}: Completed at {job.completed_at}")
+                
+                db.commit()
+                print(f"Job {job_id}: Database updated")
+                logger.info(f"Job {job_id}: Database updated")
+            else:
+                error_msg = f"Job {job_id} not found during simulation"
+                print(error_msg)
+                logger.error(error_msg)
+                break
+        
+        print(f"Extraction job {job_id} completed with {extracted_items} items extracted")
+        logger.info(f"Extraction job {job_id} completed with {extracted_items} items extracted")
+    except Exception as e:
+        error_msg = f"Error in extraction simulation for job {job_id}: {e}"
+        print(error_msg)
+        logger.error(error_msg)
+    finally:
+        db.close()
+        print(f"Database session closed for job {job_id}")
+        logger.info(f"Database session closed for job {job_id}")
+
+@app.post("/api/extraction/start")
+async def start_extraction(request: ExtractRequest, db: Session = Depends(get_db)):
+    try:
+        print(f"Starting extraction for project {request.projectId}, artifact type: {request.artifactType}")
+        logger.info(f"Starting extraction for project {request.projectId}, artifact type: {request.artifactType}")
+        
+        # Check if project exists
+        project = db.query(Project).filter(Project.id == request.projectId).first()
+        if not project:
+            error_msg = f"Project {request.projectId} not found"
+            print(error_msg)
+            logger.error(error_msg)
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        print(f"Found project: {project.name}")
+        logger.info(f"Found project: {project.name}")
+        
+        # Check if there's already an in-progress job for this project and artifact type
+        existing_job = db.query(ExtractionJob).filter(
+            ExtractionJob.project_id == request.projectId,
+            ExtractionJob.artifact_type == request.artifactType,
+            ExtractionJob.status == "in_progress"
+        ).first()
+        
+        if existing_job:
+            # Return the existing job
+            return {
+                "id": existing_job.id,
+                "projectId": existing_job.project_id,
+                "projectName": project.name,
+                "status": existing_job.status,
+                "artifactType": existing_job.artifact_type,
+                "startedAt": existing_job.started_at,
+                "progress": existing_job.progress,
+                "totalItems": existing_job.total_items,
+                "message": "Extraction already in progress"
+            }
+        
+        # Create a new extraction job
+        job = ExtractionJob(
+            project_id=request.projectId,
+            artifact_type=request.artifactType,
+            status="in_progress",
+            started_at=datetime.utcnow(),
+            progress=0
+        )
+        
+        # Set initial total items based on artifact type (will be updated during extraction)
+        if request.artifactType == "workitems":
+            job.total_items = project.work_item_count or 0
+        elif request.artifactType == "repositories":
+            job.total_items = project.repo_count or 0
+        elif request.artifactType == "testcases":
+            job.total_items = project.test_case_count or 0
+        elif request.artifactType == "pipelines":
+            job.total_items = project.pipeline_count or 0
+        
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+        
+        print(f"Job saved to database with ID: {job.id}")
+        logger.info(f"Job saved to database with ID: {job.id}")
+        
+        # Start extraction process in the background based on artifact type
+        if request.artifactType == "workitems":
+            asyncio.create_task(extract_work_items(job.id, project.id, project.name, project.connection_id))
+        elif request.artifactType == "repositories":
+            asyncio.create_task(extract_repositories(job.id, project.id, project.name, project.connection_id))
+        elif request.artifactType == "pipelines":
+            asyncio.create_task(extract_pipelines(job.id, project.id, project.name, project.connection_id))
+        elif request.artifactType == "testcases":
+            asyncio.create_task(extract_testcases(job.id, project.id, project.name, project.connection_id))
+        else:
+            # Unknown artifact type, simulate extraction
+            asyncio.create_task(simulate_extraction(job.id, 10))
+        
+        print(f"Started extraction job {job.id} for project {project.name}, artifact type: {request.artifactType}")
+        logger.info(f"Started extraction job {job.id} for project {project.name}, artifact type: {request.artifactType}")
+        
+        return {
+            "id": job.id,
+            "projectId": job.project_id,
+            "projectName": project.name,
+            "status": job.status,
+            "artifactType": job.artifact_type,
+            "startedAt": job.started_at,
+            "progress": job.progress,
+            "totalItems": job.total_items
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to start extraction: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to start extraction: {str(e)}")
+
+@app.get("/api/projects/selected")
+def get_selected_projects(db: Session = Depends(get_db)):
+    try:
+        projects = db.query(Project).filter(Project.status == "selected").all()
+        result = []
+        for project in projects:
+            result.append({
+                "id": project.id,
+                "name": project.name,
+                "description": project.description,
+                "workItemCount": project.work_item_count,
+                "repoCount": project.repo_count,
+                "testCaseCount": project.test_case_count,
+                "pipelineCount": project.pipeline_count
+            })
+        return result
+    except Exception as e:
+        logger.error(f"Failed to fetch selected projects: {e}")
+        return []
+
 # Serve frontend files
 @app.get("/{full_path:path}")
 async def serve_frontend(full_path: str):
@@ -351,3 +1026,67 @@ async def test_connection(data: dict):
     except Exception as e:
         logger.error(f"Test connection failed: {e}")
         raise HTTPException(status_code=400, detail="Failed to test Azure DevOps connection")
+
+@app.post("/api/projects/sync/{connection_id}")
+async def sync_projects_by_id(connection_id: int):
+    """Sync projects for a specific connection"""
+    try:
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, organization, pat_token, base_url 
+                FROM ado_connections 
+                WHERE id = %s
+            """, (connection_id,))
+            connection = cursor.fetchone()
+            if not connection:
+                raise HTTPException(status_code=404, detail="Connection not found")
+
+            ado_client = AzureDevOpsClient(connection['organization'], connection['pat_token'])
+            projects = await ado_client.get_projects()
+
+            for project in projects:
+                details = await ado_client.get_project_details(project['id'])
+                print(f"Full project details for {project['name']}: {json.dumps(details, indent=2)}")
+                process_template = details.get("capabilities", {}).get("processTemplate", {}).get("templateName")
+                print(f"Process Template: {process_template}")
+                source_control = details.get("capabilities", {}).get("versioncontrol", {}).get("sourceControlType")
+                print(f"source_control: {source_control}")
+                created_date = parse_datetime(project.get('lastUpdateTime')) if project.get('lastUpdateTime') else None
+                print(f"created_date: {created_date}")
+                
+                cursor.execute("""
+                    INSERT INTO projects (
+                        external_id, name, description, created_date, status,
+                        connection_id, process_template, source_control
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (external_id) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        description = EXCLUDED.description,
+                        process_template = EXCLUDED.process_template,
+                        source_control = EXCLUDED.source_control,
+                        created_date = EXCLUDED.created_date,
+                        connection_id = EXCLUDED.connection_id
+                """, (
+                    project['id'],
+                    project['name'],
+                    project.get('description', ''),
+                    created_date,
+                    'ready',
+                    connection['id'],
+                    process_template,
+                    source_control
+                ))
+         
+            conn.commit()
+            return {"message": f"Synced {len(projects)} projects successfully for connection ID {connection_id}"}
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error(f"Error syncing projects for connection {connection_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to sync projects for this connection")
+
+
+

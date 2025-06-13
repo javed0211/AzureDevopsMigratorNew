@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,16 +21,18 @@ export default function ProjectSelection() {
   const [visibilityFilter, setVisibilityFilter] = useState("all");
   const [previewProject, setPreviewProject] = useState<Project | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("all");
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const {
     data: statistics,
     refetch: refetchStatistics
   } = useQuery<{ totalProjects: number; selectedProjects: number; inProgressProjects: number; migratedProjects: number }>({
     queryKey: ["/api/statistics"],
-    refetchInterval: 5000,
-    enabled: false,
+    enabled: true,
   });
 
   const {
@@ -38,8 +41,7 @@ export default function ProjectSelection() {
     refetch: refetchProjects
   } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
-    refetchInterval: 5000,
-    enabled: false,
+    enabled: true,
   });
 
   const {
@@ -93,9 +95,14 @@ export default function ProjectSelection() {
   const filteredProjects = (projects || []).filter((project: Project) => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (project.description?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
-    const matchesProcess = processFilter === "all" || project.processTemplate.toLowerCase() === processFilter.toLowerCase();
-    const matchesVisibility = visibilityFilter === "all" || project.visibility.toLowerCase() === visibilityFilter.toLowerCase();
-    return matchesSearch && matchesProcess && matchesVisibility;
+    const matchesProcess =
+      processFilter === "all" ||
+      (project.processTemplate && project.processTemplate.toLowerCase() === processFilter.toLowerCase());
+    const matchesVisibility =
+      visibilityFilter === "all" ||
+      project.visibility?.toLowerCase() === visibilityFilter.toLowerCase();
+    const matchesStatus = statusFilter === "all" || project.status === statusFilter;
+    return matchesSearch && matchesProcess && matchesVisibility && matchesStatus;
   });
 
   const handleSelectAll = (checked: boolean) => {
@@ -128,7 +135,17 @@ export default function ProjectSelection() {
       });
       return;
     }
-    bulkSelectMutation.mutate({ projectIds: selectedProjects, status: "selected" });
+    
+    bulkSelectMutation.mutate({ 
+      projectIds: selectedProjects, 
+      status: "selected" 
+    }, {
+      onSuccess: () => {
+        // Navigate to extraction overview page after successful update
+        queryClient.invalidateQueries({ queryKey: ['/api/projects/selected'] });
+        setLocation('/extraction');
+      }
+    });
   };
 
   const handleConfirmExtraction = () => {
@@ -159,14 +176,19 @@ export default function ProjectSelection() {
     );
   };
 
-  const getProcessTemplateBadge = (template: string) => {
-    const colors = {
-      agile: "bg-blue-100 text-blue-800",
-      scrum: "bg-purple-100 text-purple-800",
-      cmmi: "bg-green-100 text-green-800",
-    };
-    const color = colors[template.toLowerCase() as keyof typeof colors] || "bg-gray-100 text-gray-800";
-    return <Badge className={`${color} hover:${color}`}>{template}</Badge>;
+  function getProcessTemplateBadge(template?: string) {
+    const safeTemplate = (template || "").toLowerCase();
+
+    switch (safeTemplate) {
+      case "agile":
+        return <span className="badge green">Agile</span>;
+      case "scrum":
+        return <span className="badge blue">Scrum</span>;
+      case "cmmi":
+        return <span className="badge orange">CMMI</span>;
+      default:
+        return <span className="badge gray">Unknown</span>;
+    }
   };
 
   return (
@@ -242,7 +264,7 @@ export default function ProjectSelection() {
       <Card>
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 mb-6">
-            <div className="flex-1 min-w-0">
+            <div className="w-full sm:w-[400px]">
               <div className="relative">
                 <Input
                   type="text"
@@ -289,6 +311,22 @@ export default function ProjectSelection() {
                   <SelectItem value="public">Public</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="ready">Ready</SelectItem>
+                  <SelectItem value="selected">Selected</SelectItem>
+                  <SelectItem value="extracting">Extracting</SelectItem>
+                  <SelectItem value="extracted">Extracted</SelectItem>
+                  <SelectItem value="migrating">Migrating</SelectItem>
+                  <SelectItem value="migrated">Migrated</SelectItem>
+                  <SelectItem value="error">Error</SelectItem>
+                </SelectContent>
+              </Select>
+
             </div>
           </div>
 
