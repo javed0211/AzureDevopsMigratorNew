@@ -26,6 +26,14 @@ export const api = {
     
     extract: (projectIds: number[], artifactTypes: string[]): Promise<{ message: string; projectIds: number[] }> =>
       apiRequest("POST", "/api/projects/extract", { projectIds, artifactTypes }).then(res => res.json()),
+      
+    getRepositories: (projectId: number) => 
+      apiRequest("GET", `/api/projects/${projectId}/repositories`).then(res => res.json()),
+  },
+  
+  repositories: {
+    getDetails: (repoId: number) =>
+      apiRequest("GET", `/api/repositories/${repoId}/details`).then(res => res.json()),
   },
   
   extraction: {

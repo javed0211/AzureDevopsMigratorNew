@@ -135,6 +135,18 @@ class Repository(Base):
     project = relationship("Project", back_populates="repositories")
     commits = relationship("Commit", back_populates="repository")
     pull_requests = relationship("PullRequest", back_populates="repository")
+    branches = relationship("Branch", back_populates="repository")
+
+class Branch(Base):
+    __tablename__ = "branches"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    repository_id = Column(Integer, ForeignKey("repositories.id"))
+    name = Column(String(255))
+    object_id = Column(String(255))  # Commit ID the branch points to
+    is_default = Column(Boolean, default=False)
+    
+    repository = relationship("Repository", back_populates="branches")
 
 class Commit(Base):
     __tablename__ = "commits"

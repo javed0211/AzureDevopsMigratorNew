@@ -187,6 +187,70 @@ class AzureDevOpsClient:
             logger.error(f"Error fetching projects: {e}")
             return []
             
+    async def get_repositories(self, project_name: str) -> List[Dict[str, Any]]:
+        """Get all repositories in a project"""
+        try:
+            session = await self._get_session()
+            url = f"{self.base_url}/{project_name}/_apis/git/repositories?api-version=6.0"
+            async with session.get(url, headers=self.headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get('value', [])
+                else:
+                    logger.error(f"ADO API error getting repositories: {response.status}")
+                    return []
+        except Exception as e:
+            logger.error(f"Error fetching repositories: {e}")
+            return []
+    
+    async def get_repository_branches(self, project_name: str, repository_id: str) -> List[Dict[str, Any]]:
+        """Get all branches in a repository"""
+        try:
+            session = await self._get_session()
+            url = f"{self.base_url}/{project_name}/_apis/git/repositories/{repository_id}/refs?filter=heads/&api-version=6.0"
+            async with session.get(url, headers=self.headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get('value', [])
+                else:
+                    logger.error(f"ADO API error getting branches: {response.status}")
+                    return []
+        except Exception as e:
+            logger.error(f"Error fetching branches: {e}")
+            return []
+    
+    async def get_repository_commits(self, project_name: str, repository_id: str, top: int = 100) -> List[Dict[str, Any]]:
+        """Get commits in a repository"""
+        try:
+            session = await self._get_session()
+            url = f"{self.base_url}/{project_name}/_apis/git/repositories/{repository_id}/commits?searchCriteria.top={top}&api-version=6.0"
+            async with session.get(url, headers=self.headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get('value', [])
+                else:
+                    logger.error(f"ADO API error getting commits: {response.status}")
+                    return []
+        except Exception as e:
+            logger.error(f"Error fetching commits: {e}")
+            return []
+    
+    async def get_repository_pull_requests(self, project_name: str, repository_id: str, status: str = "all") -> List[Dict[str, Any]]:
+        """Get pull requests in a repository"""
+        try:
+            session = await self._get_session()
+            url = f"{self.base_url}/{project_name}/_apis/git/repositories/{repository_id}/pullrequests?searchCriteria.status={status}&api-version=6.0"
+            async with session.get(url, headers=self.headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get('value', [])
+                else:
+                    logger.error(f"ADO API error getting pull requests: {response.status}")
+                    return []
+        except Exception as e:
+            logger.error(f"Error fetching pull requests: {e}")
+            return []
+            
     async def get_work_items_count(self, project_name: str) -> int:
         """Get the count of work items in a project"""
         try:
@@ -791,9 +855,365 @@ async def extract_work_items(job_id: int, project_id: int, project_name: str, co
 
 
 async def extract_repositories(job_id: int, project_id: int, project_name: str, connection_id: int):
-    """Extract repositories from Azure DevOps"""
-    # For now, we'll simulate repository extraction
-    await simulate_extraction(job_id, 5)  # Simulate 5 repositories
+    """Extract repositories from Azure DevOps and store them in the database"""
+    print(f"Starting repository extraction for job {job_id}, project {project_name}, connection_id: {connection_id}")
+    logger.info(f"Starting repository extraction for job {job_id}, project {project_name}, connection_id: {connection_id}")
+    
+    try:
+        # Get a new database session for this background task
+        from backend.database.connection import get_db_session
+        from backend.database.models import Repository, ExtractionLog, ADOConnection, Branch, Commit, PullRequest
+        db = get_db_session()
+        
+        # Get the ADO connection
+        connection = db.query(ADOConnection).filter(ADOConnection.id == connection_id).first()
+        print(f"Looking for connection with ID: {connection_id}")
+        logger.info(f"Looking for connection with ID: {connection_id}")
+        
+        if not connection:
+            error_msg = f"Connection {connection_id} not found"
+            print(error_msg)
+            logger.error(error_msg)
+            
+            # Update job status to failed
+            job = db.query(ExtractionJob).filter(ExtractionJob.id == job_id).first()
+            if job:
+                job.status = "failed"
+                job.error_message = error_msg
+                job.completed_at = datetime.utcnow()
+                db.commit()
+            
+            return
+        
+        # Create ADO client
+        print(f"Creating ADO client for organization: {connection.organization}")
+        logger.info(f"Creating ADO client for organization: {connection.organization}")
+        ado_client = AzureDevOpsClient(connection.organization, connection.pat_token)
+        
+        # Get the job
+        job = db.query(ExtractionJob).filter(ExtractionJob.id == job_id).first()
+        if not job:
+            error_msg = f"Job {job_id} not found"
+            print(error_msg)
+            logger.error(error_msg)
+            return
+        
+        print(f"Getting repositories for project: {project_name}")
+        logger.info(f"Getting repositories for project: {project_name}")
+        
+        # Get repositories
+        try:
+            repositories = await ado_client.get_repositories(project_name)
+            total_items = len(repositories)
+            print(f"Found {total_items} repositories for project {project_name}")
+            logger.info(f"Found {total_items} repositories for project {project_name}")
+        except Exception as e:
+            error_msg = f"Error getting repositories: {e}"
+            print(error_msg)
+            logger.error(error_msg)
+            
+            # Update job status to failed
+            job.status = "failed"
+            job.error_message = error_msg
+            job.completed_at = datetime.utcnow()
+            db.commit()
+            
+            # Close the ADO client session
+            try:
+                await ado_client.close()
+            except Exception as close_error:
+                logger.error(f"Error closing ADO client session: {close_error}")
+                
+            return
+        
+        # Update job with total items
+        job.total_items = total_items
+        db.commit()
+        
+        if total_items == 0:
+            logger.info(f"No repositories found for project {project_name}")
+            job.status = "completed"
+            job.progress = 100
+            job.completed_at = datetime.utcnow()
+            db.commit()
+            return
+        
+        # Process repositories
+        extracted_items = 0
+        
+        for repo in repositories:
+            repo_id = repo.get('id')
+            repo_name = repo.get('name')
+            
+            # Check if repository already exists
+            existing_repo = db.query(Repository).filter(
+                Repository.project_id == project_id,
+                Repository.external_id == repo_id
+            ).first()
+            
+            if existing_repo:
+                # Update existing repository
+                existing_repo.name = repo_name
+                existing_repo.url = repo.get('url')
+                existing_repo.default_branch = repo.get('defaultBranch')
+                existing_repo.size = repo.get('size')
+                db.commit()
+                repository_db_id = existing_repo.id
+            else:
+                # Create new repository
+                new_repo = Repository(
+                    project_id=project_id,
+                    external_id=repo_id,
+                    name=repo_name,
+                    url=repo.get('url'),
+                    default_branch=repo.get('defaultBranch'),
+                    size=repo.get('size')
+                )
+                db.add(new_repo)
+                db.commit()
+                repository_db_id = new_repo.id
+            
+            # Log repository extraction
+            log_msg = f"Extracted repository: {repo_name} (ID: {repo_id})"
+            print(log_msg)
+            logger.info(log_msg)
+            
+            # Add log entry
+            log_entry = ExtractionLog(
+                job_id=job_id,
+                level="INFO",
+                message=log_msg,
+                timestamp=datetime.utcnow()
+            )
+            db.add(log_entry)
+            db.commit()
+            
+            # Extract branches
+            try:
+                branches = await ado_client.get_repository_branches(project_name, repo_id)
+                print(f"Found {len(branches)} branches for repository {repo_name}")
+                logger.info(f"Found {len(branches)} branches for repository {repo_name}")
+                
+                # Clear existing branches for this repository
+                db.query(Branch).filter(Branch.repository_id == repository_db_id).delete()
+                db.commit()
+                
+                # Store branches
+                default_branch = repo.get('defaultBranch', '').replace('refs/heads/', '')
+                for branch in branches:
+                    branch_name = branch.get('name', '')
+                    if branch_name.startswith('refs/heads/'):
+                        branch_name = branch_name[11:]  # Remove 'refs/heads/' prefix
+                    
+                    new_branch = Branch(
+                        repository_id=repository_db_id,
+                        name=branch_name,
+                        object_id=branch.get('objectId'),
+                        is_default=(branch_name == default_branch)
+                    )
+                    db.add(new_branch)
+                
+                db.commit()
+                log_msg = f"Extracted {len(branches)} branches for repository {repo_name}"
+                print(log_msg)
+                logger.info(log_msg)
+                
+                # Add log entry
+                log_entry = ExtractionLog(
+                    job_id=job_id,
+                    level="INFO",
+                    message=log_msg,
+                    timestamp=datetime.utcnow()
+                )
+                db.add(log_entry)
+                db.commit()
+            except Exception as e:
+                error_msg = f"Error extracting branches for repository {repo_name}: {e}"
+                print(error_msg)
+                logger.error(error_msg)
+                
+                # Add log entry
+                log_entry = ExtractionLog(
+                    job_id=job_id,
+                    level="ERROR",
+                    message=error_msg,
+                    timestamp=datetime.utcnow()
+                )
+                db.add(log_entry)
+                db.commit()
+            
+            # Extract commits
+            try:
+                commits = await ado_client.get_repository_commits(project_name, repo_id, top=100)
+                print(f"Found {len(commits)} commits for repository {repo_name}")
+                logger.info(f"Found {len(commits)} commits for repository {repo_name}")
+                
+                # Clear existing commits for this repository
+                db.query(Commit).filter(Commit.repository_id == repository_db_id).delete()
+                db.commit()
+                
+                # Store commits
+                for commit in commits:
+                    new_commit = Commit(
+                        repository_id=repository_db_id,
+                        commit_id=commit.get('commitId'),
+                        author=commit.get('author', {}).get('name'),
+                        committer=commit.get('committer', {}).get('name'),
+                        comment=commit.get('comment'),
+                        commit_date=commit.get('author', {}).get('date')
+                    )
+                    db.add(new_commit)
+                
+                db.commit()
+                log_msg = f"Extracted {len(commits)} commits for repository {repo_name}"
+                print(log_msg)
+                logger.info(log_msg)
+                
+                # Add log entry
+                log_entry = ExtractionLog(
+                    job_id=job_id,
+                    level="INFO",
+                    message=log_msg,
+                    timestamp=datetime.utcnow()
+                )
+                db.add(log_entry)
+                db.commit()
+            except Exception as e:
+                error_msg = f"Error extracting commits for repository {repo_name}: {e}"
+                print(error_msg)
+                logger.error(error_msg)
+                
+                # Add log entry
+                log_entry = ExtractionLog(
+                    job_id=job_id,
+                    level="ERROR",
+                    message=error_msg,
+                    timestamp=datetime.utcnow()
+                )
+                db.add(log_entry)
+                db.commit()
+            
+            # Extract pull requests
+            try:
+                pull_requests = await ado_client.get_repository_pull_requests(project_name, repo_id)
+                print(f"Found {len(pull_requests)} pull requests for repository {repo_name}")
+                logger.info(f"Found {len(pull_requests)} pull requests for repository {repo_name}")
+                
+                # Clear existing pull requests for this repository
+                db.query(PullRequest).filter(PullRequest.repository_id == repository_db_id).delete()
+                db.commit()
+                
+                # Store pull requests
+                for pr in pull_requests:
+                    new_pr = PullRequest(
+                        repository_id=repository_db_id,
+                        external_id=pr.get('pullRequestId'),
+                        title=pr.get('title'),
+                        description=pr.get('description'),
+                        status=pr.get('status'),
+                        created_by=pr.get('createdBy', {}).get('displayName'),
+                        created_date=pr.get('creationDate'),
+                        source_branch=pr.get('sourceRefName'),
+                        target_branch=pr.get('targetRefName')
+                    )
+                    db.add(new_pr)
+                
+                db.commit()
+                log_msg = f"Extracted {len(pull_requests)} pull requests for repository {repo_name}"
+                print(log_msg)
+                logger.info(log_msg)
+                
+                # Add log entry
+                log_entry = ExtractionLog(
+                    job_id=job_id,
+                    level="INFO",
+                    message=log_msg,
+                    timestamp=datetime.utcnow()
+                )
+                db.add(log_entry)
+                db.commit()
+            except Exception as e:
+                error_msg = f"Error extracting pull requests for repository {repo_name}: {e}"
+                print(error_msg)
+                logger.error(error_msg)
+                
+                # Add log entry
+                log_entry = ExtractionLog(
+                    job_id=job_id,
+                    level="ERROR",
+                    message=error_msg,
+                    timestamp=datetime.utcnow()
+                )
+                db.add(log_entry)
+                db.commit()
+            
+            extracted_items += 1
+            
+            # Update job progress
+            progress = int((extracted_items / total_items) * 100)
+            job.progress = progress
+            job.extracted_items = extracted_items
+            db.commit()
+            
+            # Log progress
+            log_msg = f"Processed {extracted_items}/{total_items} repositories ({progress}%)"
+            print(log_msg)
+            logger.info(log_msg)
+            
+            # Sleep briefly to avoid overwhelming the API
+            await asyncio.sleep(0.5)
+        
+        # Mark job as completed
+        job.status = "completed"
+        job.completed_at = datetime.utcnow()
+        db.commit()
+        
+        # Update project repository count
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if project:
+            project.repo_count = total_items
+            db.commit()
+        
+        print(f"Repository extraction completed for project {project_name}: {extracted_items} repositories extracted")
+        logger.info(f"Repository extraction completed for project {project_name}: {extracted_items} repositories extracted")
+    
+    except Exception as e:
+        error_msg = f"Error extracting repositories for job {job_id}: {e}"
+        print(error_msg)
+        logger.error(error_msg)
+        
+        # Update job status to failed
+        job = db.query(ExtractionJob).filter(ExtractionJob.id == job_id).first()
+        if job:
+            job.status = "failed"
+            job.error_message = str(e)
+            job.completed_at = datetime.utcnow()
+            db.commit()
+            
+            # Add error log
+            log_entry = ExtractionLog(
+                job_id=job_id,
+                level="ERROR",
+                message=error_msg,
+                timestamp=datetime.utcnow()
+            )
+            db.add(log_entry)
+            db.commit()
+    
+    finally:
+        # Close database session
+        db.close()
+        print(f"Database session closed for job {job_id}")
+        logger.info(f"Database session closed for job {job_id}")
+        
+        # Close ADO client session
+        try:
+            if 'ado_client' in locals():
+                await ado_client.close()
+                print(f"ADO client session closed for job {job_id}")
+                logger.info(f"ADO client session closed for job {job_id}")
+        except Exception as close_error:
+            logger.error(f"Error closing ADO client session: {close_error}")
 
 
 async def extract_pipelines(job_id: int, project_id: int, project_name: str, connection_id: int):
@@ -987,6 +1407,184 @@ def get_selected_projects(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Failed to fetch selected projects: {e}")
         return []
+        
+@app.get("/api/projects/{project_id}/repositories")
+def get_project_repositories(project_id: int, db: Session = Depends(get_db)):
+    """Get all repositories for a project"""
+    try:
+        from backend.database.models import Repository
+        
+        # Get the project
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        # Get repositories
+        repositories = db.query(Repository).filter(Repository.project_id == project_id).all()
+        
+        return [
+            {
+                "id": repo.id,
+                "externalId": repo.external_id,
+                "name": repo.name,
+                "url": repo.url,
+                "defaultBranch": repo.default_branch,
+                "size": repo.size
+            }
+            for repo in repositories
+        ]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch repositories for project {project_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch repositories: {str(e)}")
+        
+@app.get("/api/repositories/{repo_id}/details")
+async def get_repository_details(repo_id: int, db: Session = Depends(get_db)):
+    """Get detailed information about a repository including commits, branches, and PRs"""
+    try:
+        from backend.database.models import Repository, Project, ADOConnection, Commit, PullRequest, Branch
+        
+        # Get the repository
+        repository = db.query(Repository).filter(Repository.id == repo_id).first()
+        if not repository:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        
+        # Get the project
+        project = db.query(Project).filter(Project.id == repository.project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        # Get the connection
+        connection = db.query(ADOConnection).filter(ADOConnection.id == project.connection_id).first()
+        if not connection:
+            raise HTTPException(status_code=404, detail="Connection not found")
+        
+        # Create ADO client
+        ado_client = AzureDevOpsClient(connection.organization, connection.pat_token)
+        
+        # Get commits
+        commits = db.query(Commit).filter(Commit.repository_id == repo_id).order_by(Commit.commit_date.desc()).limit(10).all()
+        
+        # Get pull requests
+        pull_requests = db.query(PullRequest).filter(PullRequest.repository_id == repo_id).order_by(PullRequest.created_date.desc()).limit(10).all()
+        
+        # If no commits or PRs in database, fetch from API
+        if not commits:
+            api_commits = await ado_client.get_repository_commits(project.name, repository.external_id, top=10)
+            commits_data = []
+            for commit in api_commits:
+                commits_data.append({
+                    "commitId": commit.get('commitId'),
+                    "author": commit.get('author', {}).get('name'),
+                    "committer": commit.get('committer', {}).get('name'),
+                    "comment": commit.get('comment'),
+                    "commitDate": commit.get('author', {}).get('date')
+                })
+        else:
+            commits_data = [
+                {
+                    "id": commit.id,
+                    "commitId": commit.commit_id,
+                    "author": commit.author,
+                    "committer": commit.committer,
+                    "comment": commit.comment,
+                    "commitDate": commit.commit_date
+                }
+                for commit in commits
+            ]
+        
+        if not pull_requests:
+            api_prs = await ado_client.get_repository_pull_requests(project.name, repository.external_id)
+            prs_data = []
+            for pr in api_prs:
+                prs_data.append({
+                    "id": pr.get('pullRequestId'),
+                    "title": pr.get('title'),
+                    "description": pr.get('description'),
+                    "status": pr.get('status'),
+                    "createdBy": pr.get('createdBy', {}).get('displayName'),
+                    "createdDate": pr.get('creationDate'),
+                    "sourceBranch": pr.get('sourceRefName'),
+                    "targetBranch": pr.get('targetRefName')
+                })
+        else:
+            prs_data = [
+                {
+                    "id": pr.id,
+                    "externalId": pr.external_id,
+                    "title": pr.title,
+                    "description": pr.description,
+                    "status": pr.status,
+                    "createdBy": pr.created_by,
+                    "createdDate": pr.created_date,
+                    "sourceBranch": pr.source_branch,
+                    "targetBranch": pr.target_branch
+                }
+                for pr in pull_requests
+            ]
+        
+        # Get branches
+        try:
+            # Try to get branches from database
+            branches = db.query(Branch).filter(Branch.repository_id == repo_id).all()
+            
+            # If no branches in database, fetch from API
+            if not branches:
+                branches_data = []
+                api_branches = await ado_client.get_repository_branches(project.name, repository.external_id)
+                for branch in api_branches:
+                    name = branch.get('name', '')
+                    if name.startswith('refs/heads/'):
+                        name = name[11:]  # Remove 'refs/heads/' prefix
+                    branches_data.append({
+                        "name": name,
+                        "objectId": branch.get('objectId'),
+                        "isDefault": name == repository.default_branch.replace('refs/heads/', '') if repository.default_branch else False
+                    })
+            else:
+                branches_data = [
+                    {
+                        "name": branch.name,
+                        "objectId": branch.object_id,
+                        "isDefault": branch.is_default
+                    }
+                    for branch in branches
+                ]
+        except Exception as e:
+            # If there's an error (e.g., branches table doesn't exist yet), fetch from API
+            logger.error(f"Error fetching branches from database: {e}")
+            branches_data = []
+            api_branches = await ado_client.get_repository_branches(project.name, repository.external_id)
+            for branch in api_branches:
+                name = branch.get('name', '')
+                if name.startswith('refs/heads/'):
+                    name = name[11:]  # Remove 'refs/heads/' prefix
+                branches_data.append({
+                    "name": name,
+                    "objectId": branch.get('objectId'),
+                    "isDefault": name == repository.default_branch.replace('refs/heads/', '') if repository.default_branch else False
+                })
+        
+        # Close the ADO client session
+        await ado_client.close()
+        
+        return {
+            "id": repository.id,
+            "externalId": repository.external_id,
+            "name": repository.name,
+            "url": repository.url,
+            "defaultBranch": repository.default_branch,
+            "size": repository.size,
+            "commits": commits_data,
+            "pullRequests": prs_data,
+            "branches": branches_data
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch repository details for repository {repo_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch repository details: {str(e)}")
 
 # Serve frontend files
 @app.get("/{full_path:path}")
