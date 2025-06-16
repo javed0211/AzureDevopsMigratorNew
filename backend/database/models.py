@@ -38,6 +38,10 @@ class Project(Base):
     repo_count = Column(Integer, default=0)
     test_case_count = Column(Integer, default=0)
     pipeline_count = Column(Integer, default=0)
+    custom_field_count = Column(Integer, default=0)
+    area_path_count = Column(Integer, default=0)
+    iteration_path_count = Column(Integer, default=0)
+    user_count = Column(Integer, default=0)
     
     # Relationships
     connection = relationship("ADOConnection", back_populates="projects")
@@ -48,6 +52,10 @@ class Project(Base):
     boards = relationship("Board", back_populates="project")
     queries = relationship("Query", back_populates="project")
     extraction_jobs = relationship("ExtractionJob", back_populates="project")
+    area_paths = relationship("AreaPath", backref="project_ref")
+    iteration_paths = relationship("IterationPath", backref="project_ref")
+    custom_fields = relationship("CustomField", backref="project_ref")
+    users = relationship("User", backref="project_ref")
 
 class WorkItem(Base):
     __tablename__ = "work_items"
@@ -279,6 +287,34 @@ class Query(Base):
     
     project = relationship("Project", back_populates="queries")
 
+class AreaPath(Base):
+    __tablename__ = "area_paths"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    external_id = Column(String(255))
+    project_id = Column(Integer, ForeignKey("projects.id"))
+    name = Column(String(255))
+    path = Column(String(500))
+    parent_path = Column(String(500))
+    has_children = Column(Boolean, default=False)
+    
+    project = relationship("Project")
+
+class IterationPath(Base):
+    __tablename__ = "iteration_paths"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    external_id = Column(String(255))
+    project_id = Column(Integer, ForeignKey("projects.id"))
+    name = Column(String(255))
+    path = Column(String(500))
+    parent_path = Column(String(500))
+    start_date = Column(DateTime)
+    end_date = Column(DateTime)
+    has_children = Column(Boolean, default=False)
+    
+    project = relationship("Project")
+
 class ExtractionJob(Base):
     __tablename__ = "extraction_jobs"
     
@@ -307,3 +343,30 @@ class ExtractionLog(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
     
     job = relationship("ExtractionJob", back_populates="logs")
+
+class CustomField(Base):
+    __tablename__ = "custom_fields"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"))
+    external_id = Column(String(255))
+    name = Column(String(255))
+    reference_name = Column(String(255))
+    type = Column(String(100))  # String, Integer, DateTime, HTML, Identity, etc.
+    usage = Column(Integer, default=0)  # Usage percentage or count
+    work_item_types = Column(Text)  # Comma-separated list of work item types
+    
+    project = relationship("Project")
+
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"))
+    external_id = Column(String(255))
+    display_name = Column(String(255))
+    unique_name = Column(String(255))
+    email = Column(String(255))
+    work_item_count = Column(Integer, default=0)
+    
+    project = relationship("Project")

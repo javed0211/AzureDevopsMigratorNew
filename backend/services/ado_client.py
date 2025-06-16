@@ -18,24 +18,28 @@ class AzureDevOpsClient:
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         }
+        self.session = None
 
     async def _make_request(self, endpoint: str, method: str = "GET", data: dict = None) -> dict:
         """Make async HTTP request to Azure DevOps API"""
         url = f"{self.base_url}/{endpoint}"
         
-        async with aiohttp.ClientSession() as session:
-            try:
-                if method == "GET":
-                    async with session.get(url, headers=self.headers) as response:
-                        response.raise_for_status()
-                        return await response.json()
-                elif method == "POST":
-                    async with session.post(url, headers=self.headers, json=data) as response:
-                        response.raise_for_status()
-                        return await response.json()
-            except aiohttp.ClientError as e:
-                logger.error(f"Request failed for {url}: {e}")
-                raise
+        # Create a session if one doesn't exist
+        if self.session is None or self.session.closed:
+            self.session = aiohttp.ClientSession()
+        
+        try:
+            if method == "GET":
+                async with self.session.get(url, headers=self.headers) as response:
+                    response.raise_for_status()
+                    return await response.json()
+            elif method == "POST":
+                async with self.session.post(url, headers=self.headers, json=data) as response:
+                    response.raise_for_status()
+                    return await response.json()
+        except aiohttp.ClientError as e:
+            logger.error(f"Request failed for {url}: {e}")
+            raise
 
     def _make_sync_request(self, endpoint: str, method: str = "GET", data: dict = None) -> dict:
         """Make synchronous HTTP request to Azure DevOps API"""
@@ -326,3 +330,56 @@ class AzureDevOpsClient:
                 query['path'] = path
                 flattened.append(query)
         return flattened
+        
+    async def get_area_paths(self, project_name: str) -> List[Dict[str, Any]]:
+        """Get area paths for a project"""
+        try:
+            # For now, we'll simulate area paths
+            # In a real implementation, you would call the Azure DevOps API
+            area_paths = [
+                {"id": "1", "name": "Migrated", "path": "\\Migrated", "hasChildren": False},
+                {"id": "2", "name": "Team A", "path": "\\Migrated\\Team A", "hasChildren": True},
+                {"id": "3", "name": "Team B", "path": "\\Migrated\\Team B", "hasChildren": False},
+                {"id": "4", "name": "Feature 1", "path": "\\Migrated\\Team A\\Feature 1", "hasChildren": False},
+                {"id": "5", "name": "Feature 2", "path": "\\Migrated\\Team A\\Feature 2", "hasChildren": False},
+            ]
+            return area_paths
+        except Exception as e:
+            logger.error(f"Failed to get area paths for {project_name}: {e}")
+            return []
+            
+    async def get_iteration_paths(self, project_name: str) -> List[Dict[str, Any]]:
+        """Get iteration paths for a project"""
+        try:
+            # For now, we'll simulate iteration paths
+            # In a real implementation, you would call the Azure DevOps API
+            iteration_paths = [
+                {"id": "1", "name": "Sprint 1", "path": "\\Migrated\\Sprint 1", "startDate": "2023-01-01", "endDate": "2023-01-15"},
+                {"id": "2", "name": "Sprint 2", "path": "\\Migrated\\Sprint 2", "startDate": "2023-01-16", "endDate": "2023-01-31"},
+                {"id": "3", "name": "Sprint 3", "path": "\\Migrated\\Sprint 3", "startDate": "2023-02-01", "endDate": "2023-02-15"},
+                {"id": "4", "name": "Sprint 4", "path": "\\Migrated\\Sprint 4", "startDate": "2023-02-16", "endDate": "2023-02-28"},
+                {"id": "5", "name": "Sprint 5", "path": "\\Migrated\\Sprint 5", "startDate": "2023-03-01", "endDate": "2023-03-15"},
+                {"id": "6", "name": "Sprint 6", "path": "\\Migrated\\Sprint 6", "startDate": "2023-03-16", "endDate": "2023-03-31"},
+                {"id": "7", "name": "Backlog", "path": "\\Migrated\\Backlog", "startDate": null, "endDate": null},
+            ]
+            return iteration_paths
+        except Exception as e:
+            logger.error(f"Failed to get iteration paths for {project_name}: {e}")
+            return []
+            
+    async def close(self):
+        """Close the client session"""
+        if self.session and not self.session.closed:
+            try:
+                await self.session.close()
+                logger.info("Closed ADO client session")
+            except Exception as e:
+                logger.error(f"Error closing client session: {e}")
+                
+    async def __aenter__(self):
+        """Async context manager entry"""
+        return self
+        
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit"""
+        await self.close()

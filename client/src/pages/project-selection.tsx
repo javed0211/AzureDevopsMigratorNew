@@ -405,6 +405,14 @@ export default function ProjectSelection() {
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={() => setLocation(`/projects/${project.id}/migration-summary`)}
+                        className="text-azure-blue hover:text-azure-dark mr-3"
+                      >
+                        <ChartGantt className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         className="text-gray-400 hover:text-gray-600"
                       >
                         <Settings className="h-4 w-4" />

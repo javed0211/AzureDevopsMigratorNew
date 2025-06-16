@@ -10,6 +10,9 @@ import ExtractionOverview from "@/pages/extraction-overview";
 import Migration from "@/pages/migration";
 import AuditLogs from "@/pages/audit-logs";
 import Settings from "@/pages/settings";
+import MigrationSummary from "@/pages/migration-summary";
+import WorkItemDetails from "@/pages/work-item-details";
+import WorkItems from "@/pages/work-items";
 
 import { AppHeader } from "@/components/layout/app-header";
 import { NavigationTabs } from "@/components/layout/navigation-tabs";
@@ -22,6 +25,9 @@ function Router() {
       <Route path="/migration" component={Migration} />
       <Route path="/audit" component={AuditLogs} />
       <Route path="/settings" component={Settings} />
+      <Route path="/projects/:projectId/migration-summary" component={MigrationSummary} />
+      <Route path="/projects/:projectId/work-items" component={WorkItems} />
+      <Route path="/workitems/:workItemId" component={WorkItemDetails} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -35,13 +41,13 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gradient-to-br from-gray-100 via-white to-gray-200">
           <AppHeader 
             onRefresh={handleRefresh}
             connectionStatus={true}
           />
 
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <NavigationTabs />
             <Router />
           </div>

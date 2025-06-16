@@ -2,6 +2,24 @@ import { apiRequest } from "./queryClient";
 import type { AdoConnection, Project, MigrationJob, AuditLog } from "@shared/schema";
 
 export const api = {
+  // Logs
+  logs: {
+    getSummary: () => 
+      apiRequest("GET", "/api/logs/summary").then(res => res.json()),
+    
+    getLogs: (params: { level?: string; search?: string; offset?: number; limit?: number }) => {
+      const queryParams = new URLSearchParams();
+      if (params.level) queryParams.append("level", params.level);
+      if (params.search) queryParams.append("search", params.search);
+      if (params.offset !== undefined) queryParams.append("offset", params.offset.toString());
+      if (params.limit !== undefined) queryParams.append("limit", params.limit.toString());
+      
+      return apiRequest("GET", `/api/logs?${queryParams.toString()}`).then(res => res.json());
+    }
+  },
+
+  // Work Items API
+
   // Projects - Updated for Python FastAPI backend
   projects: {
     getAll: (): Promise<Project[]> => 
@@ -29,11 +47,43 @@ export const api = {
       
     getRepositories: (projectId: number) => 
       apiRequest("GET", `/api/projects/${projectId}/repositories`).then(res => res.json()),
+      
+    getMigrationSummary: (projectId: number) =>
+      apiRequest("GET", `/api/projects/${projectId}/migration-summary`).then(res => res.json()),
+      
+    getWorkItems: (projectId: number) =>
+      apiRequest("GET", `/api/projects/${projectId}/workitems`).then(res => res.json()),
+      
+    getAreaPaths: (projectId: number) =>
+      apiRequest("GET", `/api/projects/${projectId}/areapaths`).then(res => res.json()),
+      
+    getIterationPaths: (projectId: number) =>
+      apiRequest("GET", `/api/projects/${projectId}/iterationpaths`).then(res => res.json()),
+      
+    getWorkItemTypes: (projectId: number) =>
+      apiRequest("GET", `/api/projects/${projectId}/workitemtypes`).then(res => res.json()),
+      
+    getCustomFields: (projectId: number) =>
+      apiRequest("GET", `/api/projects/${projectId}/customfields`).then(res => res.json()),
+      
+    getBoardColumns: (projectId: number) =>
+      apiRequest("GET", `/api/projects/${projectId}/boardcolumns`).then(res => res.json()),
+      
+    getWikiPages: (projectId: number) =>
+      apiRequest("GET", `/api/projects/${projectId}/wikipages`).then(res => res.json()),
+      
+    getExtractionHistory: (projectId: number) => 
+      apiRequest("GET", `/api/projects/${projectId}/extraction-history`).then(res => res.json()),
   },
   
   repositories: {
     getDetails: (repoId: number) =>
       apiRequest("GET", `/api/repositories/${repoId}/details`).then(res => res.json()),
+  },
+  
+  workItems: {
+    getDetails: (workItemId: number) =>
+      apiRequest("GET", `/api/workitems/${workItemId}`).then(res => res.json()),
   },
   
   extraction: {
